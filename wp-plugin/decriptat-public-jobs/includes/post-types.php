@@ -1,0 +1,81 @@
+<?php
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/**
+ * Register the public job custom post type.
+ */
+function decriptat_pj_register_post_type() {
+	$labels = array(
+		'name'          => __( 'Public Jobs', 'decriptat-public-jobs' ),
+		'singular_name' => __( 'Public Job', 'decriptat-public-jobs' ),
+		'menu_name'     => __( 'Public Jobs', 'decriptat-public-jobs' ),
+		'add_new_item'  => __( 'Add New Public Job', 'decriptat-public-jobs' ),
+		'edit_item'     => __( 'Edit Public Job', 'decriptat-public-jobs' ),
+		'new_item'      => __( 'New Public Job', 'decriptat-public-jobs' ),
+		'view_item'     => __( 'View Public Job', 'decriptat-public-jobs' ),
+		'search_items'  => __( 'Search Public Jobs', 'decriptat-public-jobs' ),
+	);
+
+	register_post_type(
+		'public_job',
+		array(
+			'labels'       => $labels,
+			'public'       => true,
+			'has_archive'  => true,
+			'show_in_rest' => true,
+			'menu_icon'    => 'dashicons-id',
+			'rewrite'      => array( 'slug' => 'public-jobs' ),
+			'supports'     => array( 'title', 'editor', 'excerpt', 'thumbnail' ),
+		)
+	);
+}
+add_action( 'init', 'decriptat_pj_register_post_type' );
+
+/**
+ * Register taxonomies for public jobs.
+ */
+function decriptat_pj_register_taxonomies() {
+	register_taxonomy(
+		'institution',
+		'public_job',
+		array(
+			'label'        => __( 'Institutions', 'decriptat-public-jobs' ),
+			'public'       => true,
+			'hierarchical' => false,
+			'show_in_rest' => true,
+			'rewrite'      => array( 'slug' => 'institution' ),
+		)
+	);
+
+	register_taxonomy(
+		'job_category',
+		'public_job',
+		array(
+			'label'        => __( 'Job Categories', 'decriptat-public-jobs' ),
+			'public'       => true,
+			'hierarchical' => true,
+			'show_in_rest' => true,
+			'rewrite'      => array( 'slug' => 'job-category' ),
+		)
+	);
+}
+add_action( 'init', 'decriptat_pj_register_taxonomies' );
+
+/**
+ * Ensure public_job archive is ordered newest first.
+ *
+ * @param WP_Query $query Query object.
+ */
+function decriptat_pj_archive_order( $query ) {
+	if ( is_admin() || ! $query->is_main_query() ) {
+		return;
+	}
+
+	if ( $query->is_post_type_archive( 'public_job' ) ) {
+		$query->set( 'orderby', 'date' );
+		$query->set( 'order', 'DESC' );
+	}
+}
+add_action( 'pre_get_posts', 'decriptat_pj_archive_order' );
