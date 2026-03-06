@@ -61,5 +61,17 @@ function decriptat_pj_register_meta() {
 			'sanitize_callback' => 'rest_sanitize_boolean',
 		)
 	);
+
+	register_post_meta(
+		'public_job',
+		'expired',
+		array(
+			'type'              => 'boolean',
+			'single'            => true,
+			'show_in_rest'      => true,
+			'sanitize_callback' => 'rest_sanitize_boolean',
+			'default'           => false,
+		)
+	);
 }
 add_action( 'init', 'decriptat_pj_register_meta' );
