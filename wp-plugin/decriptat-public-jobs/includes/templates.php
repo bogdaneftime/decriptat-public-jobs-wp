@@ -4,6 +4,38 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
+ * Enqueue frontend assets for plugin templates and shortcode pages.
+ */
+function decriptat_pj_enqueue_assets() {
+	wp_enqueue_style(
+		'decriptat-public-jobs-frontend',
+		DECRIPTAT_PJ_PLUGIN_URL . 'assets/css/public-jobs.css',
+		array(),
+		'1.0.0'
+	);
+}
+add_action( 'wp_enqueue_scripts', 'decriptat_pj_enqueue_assets' );
+
+/**
+ * Format dates from crawler meta as localized display date.
+ *
+ * @param string $raw_date Raw date from meta.
+ * @return string
+ */
+function decriptat_pj_format_date( $raw_date ) {
+	if ( empty( $raw_date ) ) {
+		return '';
+	}
+
+	$timestamp = strtotime( $raw_date );
+	if ( false === $timestamp ) {
+		return $raw_date;
+	}
+
+	return wp_date( get_option( 'date_format' ), $timestamp );
+}
+
+/**
  * Load plugin templates for public_job post type.
  *
  * @param string $template Current template.

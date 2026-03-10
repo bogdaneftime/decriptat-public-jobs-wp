@@ -90,6 +90,21 @@ function decriptat_pj_render_jobs_shortcode( $it_only = false ) {
 		}
 	}
 
+	$selected_category = '';
+	if ( isset( $_GET['job_category'] ) ) {
+		$selected_category = sanitize_title( wp_unslash( $_GET['job_category'] ) );
+	}
+
+	if ( ! empty( $selected_category ) ) {
+		$args['tax_query'] = array(
+			array(
+				'taxonomy' => 'job_category',
+				'field'    => 'slug',
+				'terms'    => array( $selected_category ),
+			),
+		);
+	}
+
 	if ( $it_only ) {
 		$args['meta_query'] = array(
 			array(
@@ -102,60 +117,96 @@ function decriptat_pj_render_jobs_shortcode( $it_only = false ) {
 
 	$query = new WP_Query( $args );
 	$posts = $query->posts;
+	$category_terms = get_terms(
+		array(
+			'taxonomy'   => 'job_category',
+			'hide_empty' => true,
+		)
+	);
 
 	usort( $posts, 'decriptat_pj_sort_jobs' );
 
 	ob_start();
 	?>
-	<style>
-		.decriptat-pj-search { margin-bottom: 14px; }
-		.decriptat-pj-search input[type="search"] { width: 100%; max-width: 360px; padding: 8px 10px; border: 1px solid #d2d7df; border-radius: 6px; }
-		.decriptat-pj-jobs { list-style: none; margin: 0; padding: 0; }
-		.decriptat-pj-job { padding: 12px; border: 1px solid #e6e9ef; border-radius: 8px; margin-bottom: 10px; background: #fff; transition: opacity 0.2s ease; }
-		.decriptat-pj-job.is-expired { opacity: 0.6; }
-		.decriptat-pj-job-title { display: inline-block; font-weight: 600; margin-bottom: 8px; }
-		.decriptat-pj-badges { display: flex; flex-wrap: wrap; gap: 6px; }
-		.decriptat-pj-badge { display: inline-block; font-size: 12px; line-height: 1; padding: 5px 8px; border-radius: 999px; background: #f3f6fb; color: #22304a; border: 1px solid #dfe5ef; }
-		.decriptat-pj-badge-status-active { background: #edf8ef; color: #1f5b2c; border-color: #cde7d2; }
-		.decriptat-pj-badge-status-expired { background: #fbecec; color: #7b1e1e; border-color: #f3cccc; }
-	</style>
-	<div class="decriptat-pj-shortcode-list">
-		<form class="decriptat-pj-search" method="get">
-			<input type="search" name="q" placeholder="<?php esc_attr_e( 'Cauta joburi...', 'decriptat-public-jobs' ); ?>" value="<?php echo esc_attr( $search_query ); ?>" />
+	<div class="decriptat-pj-shell decriptat-pj-shortcode-list">
+		<form class="decriptat-pj-filter-form decriptat-pj-shortcode-filter" method="get">
+			<div class="decriptat-pj-filter-field decriptat-pj-filter-search">
+				<label for="decriptat-pj-shortcode-q"><?php esc_html_e( 'Cauta', 'decriptat-public-jobs' ); ?></label>
+				<input id="decriptat-pj-shortcode-q" type="search" name="q" placeholder="<?php esc_attr_e( 'Titlu, cuvinte cheie...', 'decriptat-public-jobs' ); ?>" value="<?php echo esc_attr( $search_query ); ?>" />
+			</div>
+			<div class="decriptat-pj-filter-field">
+				<label for="decriptat-pj-shortcode-category"><?php esc_html_e( 'Categorie', 'decriptat-public-jobs' ); ?></label>
+				<select id="decriptat-pj-shortcode-category" name="job_category">
+					<option value=""><?php esc_html_e( 'Toate', 'decriptat-public-jobs' ); ?></option>
+					<?php if ( ! is_wp_error( $category_terms ) ) : ?>
+						<?php foreach ( $category_terms as $term ) : ?>
+							<option value="<?php echo esc_attr( $term->slug ); ?>" <?php selected( $selected_category, $term->slug ); ?>>
+								<?php echo esc_html( $term->name ); ?>
+							</option>
+						<?php endforeach; ?>
+					<?php endif; ?>
+				</select>
+			</div>
+			<div class="decriptat-pj-filter-actions">
+				<button type="submit" class="decriptat-pj-btn"><?php esc_html_e( 'Filtreaza', 'decriptat-public-jobs' ); ?></button>
+			</div>
 		</form>
 		<?php if ( ! empty( $posts ) ) : ?>
-			<ul class="decriptat-pj-jobs">
+			<div class="decriptat-pj-job-grid decriptat-pj-job-grid-shortcode">
 				<?php
 				foreach ( $posts as $job_post ) :
-					$location    = get_post_meta( $job_post->ID, 'location', true );
-					$state       = decriptat_pj_get_job_state( $job_post->ID );
+					$location     = get_post_meta( $job_post->ID, 'location', true );
+					$published    = get_post_meta( $job_post->ID, 'published_date', true );
+					$state        = decriptat_pj_get_job_state( $job_post->ID );
 					$institutions = get_the_terms( $job_post->ID, 'institution' );
-					$institution = '';
+					$categories   = get_the_terms( $job_post->ID, 'job_category' );
+					$institution  = '';
 					if ( ! is_wp_error( $institutions ) && ! empty( $institutions ) ) {
 						$institution = $institutions[0]->name;
 					}
-					$item_class = $state['is_expired'] ? 'decriptat-pj-job is-expired' : 'decriptat-pj-job';
+					$item_class = $state['is_expired'] ? 'decriptat-pj-job-card is-expired' : 'decriptat-pj-job-card';
 					?>
-					<li class="<?php echo esc_attr( $item_class ); ?>">
-						<a class="decriptat-pj-job-title" href="<?php echo esc_url( get_permalink( $job_post->ID ) ); ?>"><?php echo esc_html( get_the_title( $job_post->ID ) ); ?></a>
-						<div class="decriptat-pj-badges">
-							<?php if ( ! empty( $institution ) ) : ?>
-								<span class="decriptat-pj-badge"><?php echo esc_html( $institution ); ?></span>
-							<?php endif; ?>
-							<?php if ( ! empty( $state['deadline'] ) ) : ?>
-								<span class="decriptat-pj-badge"><?php echo esc_html( $state['deadline'] ); ?></span>
-							<?php endif; ?>
-							<?php if ( ! empty( $location ) ) : ?>
-								<span class="decriptat-pj-badge"><?php echo esc_html( $location ); ?></span>
-							<?php endif; ?>
+					<article class="<?php echo esc_attr( $item_class ); ?>">
+						<div class="decriptat-pj-card-top">
 							<?php if ( ! empty( $state['label'] ) ) : ?>
-								<?php $status_class = $state['is_expired'] ? 'decriptat-pj-badge decriptat-pj-badge-status-expired' : 'decriptat-pj-badge decriptat-pj-badge-status-active'; ?>
-								<span class="<?php echo esc_attr( $status_class ); ?>"><?php echo esc_html( $state['label'] ); ?></span>
+								<span class="decriptat-pj-status-badge <?php echo $state['is_expired'] ? 'is-expired' : 'is-active'; ?>">
+									<?php echo esc_html( $state['label'] ); ?>
+								</span>
 							<?php endif; ?>
 						</div>
-					</li>
+
+						<h3 class="decriptat-pj-card-title">
+							<a href="<?php echo esc_url( get_permalink( $job_post->ID ) ); ?>"><?php echo esc_html( get_the_title( $job_post->ID ) ); ?></a>
+						</h3>
+
+						<div class="decriptat-pj-meta-chips">
+							<?php if ( ! empty( $institution ) ) : ?>
+								<span class="decriptat-pj-chip decriptat-pj-chip-soft"><?php echo esc_html( $institution ); ?></span>
+							<?php endif; ?>
+							<?php if ( ! empty( $state['deadline'] ) ) : ?>
+								<span class="decriptat-pj-chip decriptat-pj-chip-soft"><?php echo esc_html( sprintf( __( 'Termen: %s', 'decriptat-public-jobs' ), decriptat_pj_format_date( $state['deadline'] ) ) ); ?></span>
+							<?php endif; ?>
+							<?php if ( ! empty( $location ) ) : ?>
+								<span class="decriptat-pj-chip decriptat-pj-chip-soft"><?php echo esc_html( $location ); ?></span>
+							<?php endif; ?>
+						</div>
+
+						<?php if ( ! empty( $categories ) && ! is_wp_error( $categories ) ) : ?>
+							<div class="decriptat-pj-category-badges">
+								<?php foreach ( $categories as $category ) : ?>
+									<span class="decriptat-pj-category-badge"><?php echo esc_html( $category->name ); ?></span>
+								<?php endforeach; ?>
+							</div>
+						<?php endif; ?>
+
+						<?php if ( ! empty( $published ) ) : ?>
+							<div class="decriptat-pj-card-footer">
+								<span class="decriptat-pj-published"><?php echo esc_html( sprintf( __( 'Publicat: %s', 'decriptat-public-jobs' ), decriptat_pj_format_date( $published ) ) ); ?></span>
+							</div>
+						<?php endif; ?>
+					</article>
 				<?php endforeach; ?>
-			</ul>
+			</div>
 		<?php else : ?>
 			<p><?php esc_html_e( 'Nu exista joburi disponibile momentan.', 'decriptat-public-jobs' ); ?></p>
 		<?php endif; ?>

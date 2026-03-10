@@ -76,6 +76,41 @@ function decriptat_pj_archive_order( $query ) {
 	if ( $query->is_post_type_archive( 'public_job' ) ) {
 		$query->set( 'orderby', 'date' );
 		$query->set( 'order', 'DESC' );
+
+		if ( isset( $_GET['q'] ) ) {
+			$search = sanitize_text_field( wp_unslash( $_GET['q'] ) );
+			if ( '' !== $search ) {
+				$query->set( 's', $search );
+			}
+		}
+
+		$tax_query = array();
+
+		if ( isset( $_GET['job_category'] ) ) {
+			$job_category = sanitize_title( wp_unslash( $_GET['job_category'] ) );
+			if ( '' !== $job_category ) {
+				$tax_query[] = array(
+					'taxonomy' => 'job_category',
+					'field'    => 'slug',
+					'terms'    => array( $job_category ),
+				);
+			}
+		}
+
+		if ( isset( $_GET['institution'] ) ) {
+			$institution = sanitize_title( wp_unslash( $_GET['institution'] ) );
+			if ( '' !== $institution ) {
+				$tax_query[] = array(
+					'taxonomy' => 'institution',
+					'field'    => 'slug',
+					'terms'    => array( $institution ),
+				);
+			}
+		}
+
+		if ( ! empty( $tax_query ) ) {
+			$query->set( 'tax_query', $tax_query );
+		}
 	}
 }
 add_action( 'pre_get_posts', 'decriptat_pj_archive_order' );
