@@ -72,6 +72,33 @@ function decriptat_pj_unique_posts( $posts ) {
 }
 
 /**
+ * Keep only one visible job for equivalent entries (same source_url or title fallback).
+ *
+ * @param array<int, WP_Post> $posts Posts list.
+ * @return array<int, WP_Post>
+ */
+function decriptat_pj_unique_jobs( $posts ) {
+	$seen   = array();
+	$unique = array();
+
+	foreach ( $posts as $post_item ) {
+		$source_url = get_post_meta( $post_item->ID, 'source_url', true );
+		$key_source = ! empty( $source_url ) ? strtolower( trim( $source_url ) ) : '';
+		$key_title  = strtolower( trim( wp_strip_all_tags( get_the_title( $post_item->ID ) ) ) );
+		$key        = ! empty( $key_source ) ? 'source:' . $key_source : 'title:' . $key_title;
+
+		if ( isset( $seen[ $key ] ) ) {
+			continue;
+		}
+
+		$seen[ $key ] = true;
+		$unique[]     = $post_item;
+	}
+
+	return $unique;
+}
+
+/**
  * Sort jobs: active first (nearest deadline first), expired second.
  *
  * @param WP_Post $a First post.
@@ -190,7 +217,7 @@ function decriptat_pj_render_jobs_shortcode( $it_only = false ) {
 	}
 
 	$query = new WP_Query( $args );
-	$posts = decriptat_pj_unique_posts( $query->posts );
+	$posts = decriptat_pj_unique_jobs( decriptat_pj_unique_posts( $query->posts ) );
 	$category_terms = get_terms(
 		array(
 			'taxonomy'   => 'job_category',
@@ -252,6 +279,10 @@ function decriptat_pj_render_jobs_shortcode( $it_only = false ) {
 					$state        = decriptat_pj_get_job_state( $job_post->ID );
 					$institutions = get_the_terms( $job_post->ID, 'institution' );
 					$categories   = get_the_terms( $job_post->ID, 'job_category' );
+					$primary_category = '';
+					if ( ! empty( $categories ) && ! is_wp_error( $categories ) ) {
+						$primary_category = $categories[0]->name;
+					}
 					$institution  = '';
 					if ( ! is_wp_error( $institutions ) && ! empty( $institutions ) ) {
 						$institution = $institutions[0]->name;
@@ -283,11 +314,9 @@ function decriptat_pj_render_jobs_shortcode( $it_only = false ) {
 							<?php endif; ?>
 						</div>
 
-						<?php if ( ! empty( $categories ) && ! is_wp_error( $categories ) ) : ?>
+						<?php if ( ! empty( $primary_category ) ) : ?>
 							<div class="decriptat-pj-category-badges">
-								<?php foreach ( $categories as $category ) : ?>
-									<span class="decriptat-pj-category-badge"><?php echo esc_html( $category->name ); ?></span>
-								<?php endforeach; ?>
+								<span class="decriptat-pj-category-badge"><?php echo esc_html( $primary_category ); ?></span>
 							</div>
 						<?php endif; ?>
 

@@ -22,6 +22,10 @@ get_header();
 				'label'      => '',
 			);
 			$job_categories = get_the_terms( $post_id, 'job_category' );
+			$primary_category = '';
+			if ( ! empty( $job_categories ) && ! is_wp_error( $job_categories ) ) {
+				$primary_category = $job_categories[0]->name;
+			}
 			$institutions   = get_the_terms( $post_id, 'institution' );
 			?>
 			<article id="post-<?php the_ID(); ?>" <?php post_class( 'decriptat-pj-job-single' ); ?>>
@@ -51,11 +55,9 @@ get_header();
 						<?php endif; ?>
 					</div>
 
-					<?php if ( ! empty( $job_categories ) && ! is_wp_error( $job_categories ) ) : ?>
+					<?php if ( ! empty( $primary_category ) ) : ?>
 						<div class="decriptat-pj-category-badges">
-							<?php foreach ( $job_categories as $category ) : ?>
-								<span class="decriptat-pj-category-badge"><?php echo esc_html( $category->name ); ?></span>
-							<?php endforeach; ?>
+							<span class="decriptat-pj-category-badge"><?php echo esc_html( $primary_category ); ?></span>
 						</div>
 					<?php endif; ?>
 				</header>

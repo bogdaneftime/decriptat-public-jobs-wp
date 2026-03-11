@@ -95,6 +95,9 @@ $institution_terms  = get_terms(
 		if ( function_exists( 'decriptat_pj_unique_posts' ) ) {
 			$sorted_posts = decriptat_pj_unique_posts( $sorted_posts );
 		}
+		if ( function_exists( 'decriptat_pj_unique_jobs' ) ) {
+			$sorted_posts = decriptat_pj_unique_jobs( $sorted_posts );
+		}
 		if ( function_exists( 'decriptat_pj_job_matches_status' ) ) {
 			$sorted_posts = array_values(
 				array_filter(
@@ -126,6 +129,10 @@ $institution_terms  = get_terms(
 					'label'      => '',
 				);
 				$job_categories = get_the_terms( $post_id, 'job_category' );
+				$primary_category = '';
+				if ( ! empty( $job_categories ) && ! is_wp_error( $job_categories ) ) {
+					$primary_category = $job_categories[0]->name;
+				}
 				$institutions   = get_the_terms( $post_id, 'institution' );
 				$card_classes   = $state['is_expired'] ? 'decriptat-pj-job-card is-expired' : 'decriptat-pj-job-card';
 				?>
@@ -161,11 +168,9 @@ $institution_terms  = get_terms(
 						<?php endif; ?>
 					</div>
 
-					<?php if ( ! empty( $job_categories ) && ! is_wp_error( $job_categories ) ) : ?>
+					<?php if ( ! empty( $primary_category ) ) : ?>
 						<div class="decriptat-pj-category-badges">
-							<?php foreach ( $job_categories as $category ) : ?>
-								<span class="decriptat-pj-category-badge"><?php echo esc_html( $category->name ); ?></span>
-							<?php endforeach; ?>
+							<span class="decriptat-pj-category-badge"><?php echo esc_html( $primary_category ); ?></span>
 						</div>
 					<?php endif; ?>
 

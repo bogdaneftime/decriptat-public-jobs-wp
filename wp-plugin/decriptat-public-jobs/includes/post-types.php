@@ -116,3 +116,27 @@ function decriptat_pj_archive_order( $query ) {
 	}
 }
 add_action( 'pre_get_posts', 'decriptat_pj_archive_order' );
+
+/**
+ * Keep only one job_category term per public_job post.
+ *
+ * @param int $post_id Post ID.
+ */
+function decriptat_pj_enforce_single_job_category( $post_id ) {
+	if ( wp_is_post_revision( $post_id ) || wp_is_post_autosave( $post_id ) ) {
+		return;
+	}
+
+	$terms = wp_get_post_terms( $post_id, 'job_category' );
+	if ( is_wp_error( $terms ) || count( $terms ) <= 1 ) {
+		return;
+	}
+
+	$first_term = reset( $terms );
+	if ( ! $first_term || empty( $first_term->term_id ) ) {
+		return;
+	}
+
+	wp_set_post_terms( $post_id, array( (int) $first_term->term_id ), 'job_category', false );
+}
+add_action( 'save_post_public_job', 'decriptat_pj_enforce_single_job_category' );
