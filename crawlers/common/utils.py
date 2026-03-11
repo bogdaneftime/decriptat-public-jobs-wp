@@ -23,28 +23,6 @@ RO_MONTHS = {
     "decembrie": 12,
 }
 
-IT_REGEXES = [
-    re.compile(r"\bit\b", re.IGNORECASE),
-    re.compile(r"\bsoftware\b", re.IGNORECASE),
-    re.compile(r"\bdeveloper\b", re.IGNORECASE),
-    re.compile(r"\bprogramator\b", re.IGNORECASE),
-    re.compile(r"\badmin\b", re.IGNORECASE),
-    re.compile(r"\badministrator\b", re.IGNORECASE),
-    re.compile(r"\bsecurity\b", re.IGNORECASE),
-    re.compile(r"\bcyber\b", re.IGNORECASE),
-    re.compile(r"\bcibern", re.IGNORECASE),
-    re.compile(r"\bdata\b", re.IGNORECASE),
-    re.compile(r"\bbaze de date\b", re.IGNORECASE),
-    re.compile(r"\bretea\b|\bnetwork\b", re.IGNORECASE),
-    re.compile(r"\bsistem\b", re.IGNORECASE),
-    re.compile(r"\bsysadmin\b", re.IGNORECASE),
-    re.compile(r"\bdevops\b", re.IGNORECASE),
-    re.compile(r"\bcloud\b", re.IGNORECASE),
-    re.compile(r"\banalist\b", re.IGNORECASE),
-    re.compile(r"\bbi\b", re.IGNORECASE),
-]
-
-
 def strip_accents(value: str) -> str:
     normalized = unicodedata.normalize("NFKD", value)
     return "".join(ch for ch in normalized if not unicodedata.combining(ch))
@@ -101,9 +79,84 @@ def parse_deadline_to_iso(raw_text: str) -> Optional[str]:
     return None
 
 
-def detect_it(*texts: str) -> bool:
-    haystack = " ".join(normalize_text(t) for t in texts if t)
-    return any(pattern.search(haystack) for pattern in IT_REGEXES)
+def extract_iso_dates(text: str) -> list[str]:
+    if not text:
+        return []
+
+    values: list[str] = []
+    seen: set[str] = set()
+    raw = re.sub(r"\s+", " ", text).strip()
+
+    for match in re.finditer(r"\b\d{1,2}[./-]\d{1,2}[./-]\d{4}\b", raw):
+        iso_date = parse_deadline_to_iso(match.group(0))
+        if iso_date and iso_date not in seen:
+            values.append(iso_date)
+            seen.add(iso_date)
+
+    for match in re.finditer(
+        r"\b\d{1,2}\s+[A-Za-z\u0103\u00e2\u00ee\u0219\u021b\u015f\u0163]+\s+\d{4}\b",
+        raw,
+        re.IGNORECASE,
+    ):
+        iso_date = parse_deadline_to_iso(match.group(0))
+        if iso_date and iso_date not in seen:
+            values.append(iso_date)
+            seen.add(iso_date)
+
+    return values
+
+
+def extract_first_iso_date(*texts: str, preferred_year: Optional[int] = None) -> Optional[str]:
+    for raw in texts:
+        for iso_date in extract_iso_dates(raw):
+            if preferred_year is None or iso_date.startswith(f"{preferred_year:04d}-"):
+                return iso_date
+    return None
+
+
+def extract_deadline_iso(*texts: str) -> Optional[str]:
+    keywords = (
+        "termen limita",
+        "data limita",
+        "pana la data de",
+        "depunerea dosarelor",
+        "dosarele se depun pana la",
+        "concursul va avea loc",
+        "inscrierile se fac pana la",
+    )
+    candidates: list[str] = []
+
+    for raw in texts:
+        if not raw:
+            continue
+        normalized = normalize_text(raw)
+        for sentence in re.split(r"(?<=[.;\n])\s+", raw):
+            norm_sentence = normalize_text(sentence)
+            if not norm_sentence:
+                continue
+            if any(keyword in norm_sentence for keyword in keywords):
+                candidates.extend(extract_iso_dates(sentence))
+
+        # Fallback for pattern stretches like: "termen limita ... 15.05.2026".
+        for keyword in keywords:
+            pattern = re.compile(
+                rf"{re.escape(keyword)}[^0-9a-z]{{0,80}}"
+                r"(\d{1,2}[./-]\d{1,2}[./-]\d{4}|\d{1,2}\s+[a-z]+\s+\d{4})",
+                re.IGNORECASE,
+            )
+            for match in pattern.finditer(normalized):
+                parsed = parse_deadline_to_iso(match.group(1))
+                if parsed:
+                    candidates.append(parsed)
+
+    if not candidates:
+        return None
+
+    return sorted(candidates)[0]
+
+
+def is_year(value_iso: Optional[str], year: int) -> bool:
+    return bool(value_iso and value_iso.startswith(f"{year:04d}-"))
 
 
 def is_expired(deadline_iso: Optional[str]) -> bool:

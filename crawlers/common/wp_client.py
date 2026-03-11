@@ -10,6 +10,11 @@ from requests.auth import HTTPBasicAuth
 from crawlers.common.config import Settings
 from crawlers.common.models import JobRecord
 
+SOURCE_LABELS = {
+    "bnr": "BNR",
+    "adr": "ADR",
+}
+
 
 class WordPressClient:
     def __init__(self, settings: Settings) -> None:
@@ -71,10 +76,9 @@ class WordPressClient:
         return int(term_data["id"])
 
     def create_job_post(self, job: JobRecord) -> int:
-        institution_id = self.ensure_term(
-            "institution", "Banca Na\u021bional\u0103 a Rom\u00e2niei"
-        )
-        category_name = "IT" if job.is_it else "Altele"
+        institution_name = job.institution_name or "Banca Na\u021bional\u0103 a Rom\u00e2niei"
+        institution_id = self.ensure_term("institution", institution_name)
+        category_name = (job.job_category or "Altele").strip() or "Altele"
         category_id = self.ensure_term("job_category", category_name)
 
         payload: Dict[str, Any] = {
@@ -85,9 +89,10 @@ class WordPressClient:
             "job_category": [category_id],
             "meta": {
                 "source_url": job.details_url,
+                "published_date": job.published_date_iso or "",
                 "deadline": job.deadline_iso or "",
                 "location": job.location,
-                "is_it": 1 if job.is_it else 0,
+                "is_it": 1 if category_name == "IT" else 0,
                 "expired": 1 if job.expired else 0,
             },
         }
@@ -99,8 +104,11 @@ class WordPressClient:
 
 
 def _build_title(job: JobRecord) -> str:
-    suffix = f" - {job.location}" if job.location else ""
-    return f"[BNR] {job.title}{suffix}"
+    source_label = SOURCE_LABELS.get((job.source or "").lower(), (job.source or "").upper() or "SRC")
+    suffix = ""
+    if "bnr" == (job.source or "").lower() and job.location:
+        suffix = f" - {job.location}"
+    return f"[{source_label}] {job.title}{suffix}"
 
 
 def _detail_line(label: str, value: str) -> str:
@@ -108,23 +116,41 @@ def _detail_line(label: str, value: str) -> str:
 
 
 def _build_content(job: JobRecord) -> str:
+    published_label = job.published_date_iso or "Nespecificat"
     deadline_label = job.deadline_iso or "Nespecificat"
+    category_label = job.job_category or "Altele"
+    institution_label = job.institution_name or "Nespecificat"
     positions_label = str(job.number_of_positions) if job.number_of_positions else "Nespecificat"
     parts = [
-        "<p>Acest anunt de angajare a fost preluat automat de pe site-ul oficial BNR.</p>",
+        "<p>Acest anunt de angajare a fost preluat automat de pe sursa oficiala.</p>",
         "<p>Verificati sursa oficiala pentru cerinte complete si documentele necesare.</p>",
         "<h3>Detalii</h3>",
         "<ul>",
+        _detail_line("Data publicare", published_label),
         _detail_line("Structura", job.department or "Nespecificat"),
         _detail_line("Numar posturi", positions_label),
         _detail_line("Locatie", job.location or "Nespecificat"),
         _detail_line("Termen limita", deadline_label),
+        _detail_line("Categorie", category_label),
+        _detail_line("Institutie", institution_label),
         "</ul>",
         (
             f'<p><a href="{job.details_url}" target="_blank" rel="noopener noreferrer">'
             "Vezi anuntul oficial</a></p>"
         ),
     ]
+    if job.attachments:
+        parts.append("<h3>Documente atasate</h3><ul>")
+        for attachment in job.attachments:
+            label = attachment.label or "Document"
+            parts.append(
+                '<li><a href="'
+                + attachment.url
+                + '" target="_blank" rel="noopener noreferrer">'
+                + label
+                + "</a></li>"
+            )
+        parts.append("</ul>")
     if job.pdf_url:
         parts.append(
             f'<p><a href="{job.pdf_url}" target="_blank" rel="noopener noreferrer">Document (PDF)</a></p>'

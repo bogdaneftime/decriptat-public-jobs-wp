@@ -111,6 +111,69 @@ function decriptat_pj_archive_order( $query ) {
 		if ( ! empty( $tax_query ) ) {
 			$query->set( 'tax_query', $tax_query );
 		}
+
+		$status_filter = isset( $_GET['status'] ) ? sanitize_key( wp_unslash( $_GET['status'] ) ) : 'active';
+		if ( ! in_array( $status_filter, array( 'active', 'expired', 'all' ), true ) ) {
+			$status_filter = 'active';
+		}
+
+		$today = current_time( 'Y-m-d' );
+		if ( 'active' === $status_filter ) {
+			$query->set(
+				'meta_query',
+				array(
+					'relation' => 'AND',
+					array(
+						'relation' => 'OR',
+						array(
+							'key'     => 'expired',
+							'compare' => 'NOT EXISTS',
+						),
+						array(
+							'key'     => 'expired',
+							'value'   => '1',
+							'compare' => '!=',
+						),
+					),
+					array(
+						'relation' => 'OR',
+						array(
+							'key'     => 'deadline',
+							'compare' => 'NOT EXISTS',
+						),
+						array(
+							'key'     => 'deadline',
+							'value'   => '',
+							'compare' => '=',
+						),
+						array(
+							'key'     => 'deadline',
+							'value'   => $today,
+							'type'    => 'DATE',
+							'compare' => '>=',
+						),
+					),
+				)
+			);
+		} elseif ( 'expired' === $status_filter ) {
+			$query->set(
+				'meta_query',
+				array(
+					'relation' => 'OR',
+					array(
+						'key'     => 'expired',
+						'value'   => '1',
+						'compare' => '=',
+					),
+					array(
+						'key'     => 'deadline',
+						'value'   => $today,
+						'type'    => 'DATE',
+						'compare' => '<',
+					),
+				)
+			);
+		}
 	}
 }
 add_action( 'pre_get_posts', 'decriptat_pj_archive_order' );

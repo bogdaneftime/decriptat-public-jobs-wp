@@ -42,7 +42,7 @@ function decriptat_pj_get_job_state( $post_id ) {
 }
 
 /**
- * Sort jobs: active first, expired second, then newest deadline first.
+ * Sort jobs: active first (nearest deadline first), expired second.
  *
  * @param WP_Post $a First post.
  * @param WP_Post $b Second post.
@@ -58,13 +58,56 @@ function decriptat_pj_sort_jobs( $a, $b ) {
 		return $group_a - $group_b;
 	}
 
-	$deadline_a = ! empty( $state_a['deadline'] ) ? strtotime( $state_a['deadline'] ) : 0;
-	$deadline_b = ! empty( $state_b['deadline'] ) ? strtotime( $state_b['deadline'] ) : 0;
-	if ( $deadline_a !== $deadline_b ) {
-		return $deadline_b - $deadline_a;
+	$deadline_a = ! empty( $state_a['deadline'] ) ? strtotime( $state_a['deadline'] ) : false;
+	$deadline_b = ! empty( $state_b['deadline'] ) ? strtotime( $state_b['deadline'] ) : false;
+
+	if ( 0 === $group_a ) {
+		$deadline_a = false === $deadline_a ? PHP_INT_MAX : $deadline_a;
+		$deadline_b = false === $deadline_b ? PHP_INT_MAX : $deadline_b;
+		if ( $deadline_a !== $deadline_b ) {
+			return $deadline_a - $deadline_b;
+		}
+	} else {
+		$deadline_a = false === $deadline_a ? 0 : $deadline_a;
+		$deadline_b = false === $deadline_b ? 0 : $deadline_b;
+		if ( $deadline_a !== $deadline_b ) {
+			return $deadline_b - $deadline_a;
+		}
 	}
 
-	return 0;
+	$date_a = strtotime( $a->post_date_gmt );
+	$date_b = strtotime( $b->post_date_gmt );
+	return $date_b - $date_a;
+}
+
+/**
+ * Read and sanitize status filter.
+ *
+ * @return string
+ */
+function decriptat_pj_get_status_filter() {
+	$status = isset( $_GET['status'] ) ? sanitize_key( wp_unslash( $_GET['status'] ) ) : 'active';
+	if ( ! in_array( $status, array( 'active', 'expired', 'all' ), true ) ) {
+		return 'active';
+	}
+	return $status;
+}
+
+/**
+ * Whether job state should be visible for a status filter.
+ *
+ * @param array<string, mixed> $state Job state.
+ * @param string               $status_filter Filter mode.
+ * @return bool
+ */
+function decriptat_pj_job_matches_status( $state, $status_filter ) {
+	if ( 'expired' === $status_filter ) {
+		return ! empty( $state['is_expired'] );
+	}
+	if ( 'all' === $status_filter ) {
+		return true;
+	}
+	return empty( $state['is_expired'] );
 }
 
 /**
@@ -94,6 +137,7 @@ function decriptat_pj_render_jobs_shortcode( $it_only = false ) {
 	if ( isset( $_GET['job_category'] ) ) {
 		$selected_category = sanitize_title( wp_unslash( $_GET['job_category'] ) );
 	}
+	$status_filter = decriptat_pj_get_status_filter();
 
 	if ( ! empty( $selected_category ) ) {
 		$args['tax_query'] = array(
@@ -124,6 +168,16 @@ function decriptat_pj_render_jobs_shortcode( $it_only = false ) {
 		)
 	);
 
+	$posts = array_values(
+		array_filter(
+			$posts,
+			function ( $job_post ) use ( $status_filter ) {
+				$state = decriptat_pj_get_job_state( $job_post->ID );
+				return decriptat_pj_job_matches_status( $state, $status_filter );
+			}
+		)
+	);
+
 	usort( $posts, 'decriptat_pj_sort_jobs' );
 
 	ob_start();
@@ -145,6 +199,14 @@ function decriptat_pj_render_jobs_shortcode( $it_only = false ) {
 							</option>
 						<?php endforeach; ?>
 					<?php endif; ?>
+				</select>
+			</div>
+			<div class="decriptat-pj-filter-field">
+				<label for="decriptat-pj-shortcode-status"><?php esc_html_e( 'Status', 'decriptat-public-jobs' ); ?></label>
+				<select id="decriptat-pj-shortcode-status" name="status">
+					<option value="active" <?php selected( $status_filter, 'active' ); ?>><?php esc_html_e( 'Active', 'decriptat-public-jobs' ); ?></option>
+					<option value="expired" <?php selected( $status_filter, 'expired' ); ?>><?php esc_html_e( 'Expirate', 'decriptat-public-jobs' ); ?></option>
+					<option value="all" <?php selected( $status_filter, 'all' ); ?>><?php esc_html_e( 'Toate', 'decriptat-public-jobs' ); ?></option>
 				</select>
 			</div>
 			<div class="decriptat-pj-filter-actions">

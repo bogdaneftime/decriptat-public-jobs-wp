@@ -4,19 +4,22 @@ import re
 import time
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlparse
+import logging
 
 import requests
 from bs4 import BeautifulSoup, Tag
 
+from crawlers.common.classifier import classify_job
 from crawlers.common.config import Settings
 from crawlers.common.models import JobRecord
-from crawlers.common.utils import detect_it, is_expired, parse_deadline_to_iso, to_absolute_url
+from crawlers.common.utils import is_expired, parse_deadline_to_iso, to_absolute_url
 
 BNR_LISTING_URL = "https://www.bnr.ro/3025-posturi-vacante"
 BNR_BLOCKS_URL = "https://www.bnr.ro/blocks"
 TARGET_DEADLINE_YEAR = 2026
 MIN_DEADLINE_ISO = "2026-01-01"
 MAX_JOBS = 15
+LOGGER = logging.getLogger(__name__)
 
 
 def _request_with_retry(
@@ -179,6 +182,20 @@ def fetch_bnr_jobs(settings: Settings) -> List[JobRecord]:
             pdf_url, details_text = "", ""
         job.pdf_url = pdf_url
         job.details_text = details_text
-        job.is_it = detect_it(job.title, job.department, details_text)
+        result = classify_job(
+            settings=settings,
+            title=job.title,
+            department=job.department,
+            details=details_text,
+        )
+        job.job_category = result.category
+        job.is_it = result.category == "IT"
+        LOGGER.info(
+            "Classified job title=%s category=%s source=%s ambiguous=%s",
+            job.title,
+            result.category,
+            result.source,
+            result.ambiguous,
+        )
 
     return jobs

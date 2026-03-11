@@ -8,6 +8,7 @@ get_header();
 $search_query       = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : '';
 $selected_category  = isset( $_GET['job_category'] ) ? sanitize_title( wp_unslash( $_GET['job_category'] ) ) : '';
 $selected_institute = isset( $_GET['institution'] ) ? sanitize_title( wp_unslash( $_GET['institution'] ) ) : '';
+$selected_status    = function_exists( 'decriptat_pj_get_status_filter' ) ? decriptat_pj_get_status_filter() : 'active';
 $category_terms     = get_terms(
 	array(
 		'taxonomy'   => 'job_category',
@@ -69,6 +70,15 @@ $institution_terms  = get_terms(
 				</select>
 			</div>
 
+			<div class="decriptat-pj-filter-field">
+				<label for="decriptat-pj-status"><?php esc_html_e( 'Status', 'decriptat-public-jobs' ); ?></label>
+				<select id="decriptat-pj-status" name="status">
+					<option value="active" <?php selected( $selected_status, 'active' ); ?>><?php esc_html_e( 'Active', 'decriptat-public-jobs' ); ?></option>
+					<option value="expired" <?php selected( $selected_status, 'expired' ); ?>><?php esc_html_e( 'Expirate', 'decriptat-public-jobs' ); ?></option>
+					<option value="all" <?php selected( $selected_status, 'all' ); ?>><?php esc_html_e( 'Toate', 'decriptat-public-jobs' ); ?></option>
+				</select>
+			</div>
+
 			<div class="decriptat-pj-filter-actions">
 				<button type="submit" class="decriptat-pj-btn"><?php esc_html_e( 'Filtreaza', 'decriptat-public-jobs' ); ?></button>
 				<a class="decriptat-pj-reset" href="<?php echo esc_url( get_post_type_archive_link( 'public_job' ) ); ?>">
@@ -79,11 +89,18 @@ $institution_terms  = get_terms(
 	</section>
 
 	<?php if ( have_posts() ) : ?>
+		<?php
+		global $wp_query;
+		$sorted_posts = $wp_query->posts;
+		if ( function_exists( 'decriptat_pj_sort_jobs' ) ) {
+			usort( $sorted_posts, 'decriptat_pj_sort_jobs' );
+		}
+		?>
 		<div class="decriptat-pj-job-grid">
 			<?php
-			while ( have_posts() ) :
-				the_post();
-				$post_id        = get_the_ID();
+			foreach ( $sorted_posts as $job_post ) :
+				setup_postdata( $job_post );
+				$post_id        = $job_post->ID;
 				$source_url     = get_post_meta( $post_id, 'source_url', true );
 				$deadline       = get_post_meta( $post_id, 'deadline', true );
 				$location       = get_post_meta( $post_id, 'location', true );
@@ -149,7 +166,8 @@ $institution_terms  = get_terms(
 						</div>
 					</div>
 				</article>
-			<?php endwhile; ?>
+			<?php endforeach; ?>
+			<?php wp_reset_postdata(); ?>
 		</div>
 
 		<div class="decriptat-pj-pagination">

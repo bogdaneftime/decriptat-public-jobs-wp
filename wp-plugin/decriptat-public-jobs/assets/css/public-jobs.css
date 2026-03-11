@@ -51,14 +51,14 @@
 
 .decriptat-pj-filter-form {
 	display: grid;
-	grid-template-columns: 1.3fr 1fr 1fr auto;
+	grid-template-columns: 1.2fr 1fr 1fr 1fr auto;
 	gap: 0.75rem;
 	align-items: end;
 }
 
 .decriptat-pj-shortcode-filter {
 	display: grid;
-	grid-template-columns: 1.3fr 1fr auto;
+	grid-template-columns: 1.2fr 1fr 1fr auto;
 }
 
 .decriptat-pj-filter-field label {

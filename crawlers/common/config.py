@@ -14,6 +14,8 @@ class Settings:
     wp_app_pass: str
     wp_status: str
     storage_path: Path
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
     request_timeout: int = 15
     user_agent: str = "decriptat-job-crawler/0.1 (+contact@decriptat.ro)"
     retry_attempts: int = 3
@@ -29,6 +31,8 @@ def load_settings() -> Settings:
     wp_status = (os.getenv("WP_STATUS") or "draft").strip().lower() or "draft"
     storage_raw = (os.getenv("STORAGE_PATH") or "crawlers/.state/seen.sqlite").strip()
     storage_path = Path(storage_raw)
+    openai_api_key = (os.getenv("OPENAI_API_KEY") or "").strip()
+    openai_model = (os.getenv("OPENAI_MODEL") or "gpt-4o-mini").strip() or "gpt-4o-mini"
 
     if not wp_base_url:
         raise ValueError("Missing required env var: WP_BASE_URL")
@@ -45,4 +49,6 @@ def load_settings() -> Settings:
         wp_app_pass=wp_app_pass,
         wp_status=wp_status,
         storage_path=storage_path,
+        openai_api_key=openai_api_key,
+        openai_model=openai_model,
     )
