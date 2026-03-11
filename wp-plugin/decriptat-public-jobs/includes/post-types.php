@@ -76,6 +76,7 @@ function decriptat_pj_archive_order( $query ) {
 	if ( $query->is_post_type_archive( 'public_job' ) ) {
 		$query->set( 'orderby', 'date' );
 		$query->set( 'order', 'DESC' );
+		$query->set( 'posts_per_page', 100 );
 
 		if ( isset( $_GET['q'] ) ) {
 			$search = sanitize_text_field( wp_unslash( $_GET['q'] ) );
@@ -112,47 +113,6 @@ function decriptat_pj_archive_order( $query ) {
 			$query->set( 'tax_query', $tax_query );
 		}
 
-		$status_filter = isset( $_GET['status'] ) ? sanitize_key( wp_unslash( $_GET['status'] ) ) : 'active';
-		if ( ! in_array( $status_filter, array( 'active', 'expired', 'all' ), true ) ) {
-			$status_filter = 'active';
-		}
-
-		$today = current_time( 'Y-m-d' );
-		if ( 'active' === $status_filter ) {
-			$query->set(
-				'meta_query',
-				array(
-					'relation' => 'OR',
-					array(
-						'key'     => 'expired',
-						'compare' => 'NOT EXISTS',
-					),
-					array(
-						'key'     => 'expired',
-						'value'   => '1',
-						'compare' => '!=',
-					),
-				)
-			);
-		} elseif ( 'expired' === $status_filter ) {
-			$query->set(
-				'meta_query',
-				array(
-					'relation' => 'OR',
-					array(
-						'key'     => 'expired',
-						'value'   => '1',
-						'compare' => '=',
-					),
-					array(
-						'key'     => 'deadline',
-						'value'   => $today,
-						'type'    => 'DATE',
-						'compare' => '<',
-					),
-				)
-			);
-		}
 	}
 }
 add_action( 'pre_get_posts', 'decriptat_pj_archive_order' );

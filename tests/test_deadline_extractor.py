@@ -31,6 +31,15 @@ class DeadlineExtractorTests(unittest.TestCase):
         )
         self.assertEqual("2026-03-15", result.deadline_iso)
 
+    def test_extracts_bnr_application_phrase(self) -> None:
+        result = extract_application_deadline(
+            settings=self.settings,
+            title="Post vacant BNR",
+            body_text="Termen limita pentru primirea aplicatiilor: 31.01.2026",
+            attachment_text="",
+        )
+        self.assertEqual("2026-01-31", result.deadline_iso)
+
     def test_ignores_interview_and_results_dates(self) -> None:
         result = extract_application_deadline(
             settings=self.settings,

@@ -110,6 +110,7 @@ $institution_terms  = get_terms(
 			usort( $sorted_posts, 'decriptat_pj_sort_jobs' );
 		}
 		?>
+		<?php if ( ! empty( $sorted_posts ) ) : ?>
 		<div class="decriptat-pj-job-grid">
 			<?php
 			foreach ( $sorted_posts as $job_post ) :
@@ -183,10 +184,12 @@ $institution_terms  = get_terms(
 			<?php endforeach; ?>
 			<?php wp_reset_postdata(); ?>
 		</div>
-
-		<div class="decriptat-pj-pagination">
-			<?php the_posts_pagination(); ?>
-		</div>
+		<?php else : ?>
+		<section class="decriptat-pj-empty-state">
+			<h2><?php esc_html_e( 'Nu exista joburi pentru filtrul selectat.', 'decriptat-public-jobs' ); ?></h2>
+			<p><?php esc_html_e( 'Incearca alt status sau reseteaza filtrele.', 'decriptat-public-jobs' ); ?></p>
+		</section>
+		<?php endif; ?>
 	<?php else : ?>
 		<section class="decriptat-pj-empty-state">
 			<h2><?php esc_html_e( 'Momentan nu exista joburi publicate.', 'decriptat-public-jobs' ); ?></h2>

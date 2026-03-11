@@ -22,6 +22,7 @@ DEADLINE_HINTS = (
     "pana la data de",
     "data pana la care",
     "inscrierile se fac pana la",
+    "primirea aplicatiilor",
 )
 
 NON_APPLICATION_HINTS = (

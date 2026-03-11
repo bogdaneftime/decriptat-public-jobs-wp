@@ -14,17 +14,24 @@ function decriptat_pj_get_job_state( $post_id ) {
 	$expired_meta = rest_sanitize_boolean( get_post_meta( $post_id, 'expired', true ) );
 	$today_ts     = strtotime( current_time( 'Y-m-d' ) );
 	$is_expired   = false;
-	$is_active    = false;
+	$is_active    = true;
+	$has_deadline = false;
 
 	if ( ! empty( $deadline_raw ) ) {
 		$deadline_ts = strtotime( $deadline_raw );
 		if ( false !== $deadline_ts ) {
-			$is_expired = ( $deadline_ts < $today_ts );
-			$is_active  = ! $is_expired;
+			$has_deadline = true;
+			$is_expired   = ( $deadline_ts < $today_ts );
+			$is_active    = ! $is_expired;
+		} elseif ( $expired_meta ) {
+			// Respect explicit expired flag only when deadline meta exists but is malformed.
+			$is_expired = true;
+			$is_active  = false;
 		}
 	}
 
-	if ( $expired_meta ) {
+	// If no deadline was found at all, keep the listing active by default.
+	if ( $has_deadline && $expired_meta ) {
 		$is_expired = true;
 		$is_active  = false;
 	}

@@ -77,7 +77,7 @@ def _parse_positions(text: str) -> Optional[int]:
     return int(match.group(1)) if match else None
 
 
-def _extract_pdf_and_text(settings: Settings, details_url: str) -> Tuple[str, str]:
+def _extract_pdf_and_text(settings: Settings, details_url: str) -> Tuple[str, str, Optional[str]]:
     response = _request_with_retry(settings, details_url)
     soup = BeautifulSoup(response.text, "lxml")
 
@@ -90,9 +90,29 @@ def _extract_pdf_and_text(settings: Settings, details_url: str) -> Tuple[str, st
 
     root = soup.find("main") or soup.find("article") or soup.body or soup
     details_text = re.sub(r"\s+", " ", root.get_text(" ", strip=True))
-    if len(details_text) > 1200:
-        details_text = details_text[:1200]
-    return pdf_url, details_text
+    if len(details_text) > 5000:
+        details_text = details_text[:5000]
+
+    direct_deadline = _extract_bnr_deadline_from_soup(soup)
+    return pdf_url, details_text, direct_deadline
+
+
+def _extract_bnr_deadline_from_soup(soup: BeautifulSoup) -> Optional[str]:
+    text = re.sub(r"\s+", " ", soup.get_text(" ", strip=True))
+    patterns = (
+        r"termen\s+limit[ăa]\s+pentru\s+primirea\s+aplica[țt]iilor[^0-9]{0,40}"
+        r"(\d{1,2}[./-]\d{1,2}[./-]\d{4}|\d{1,2}\s+[A-Za-z\u0103\u00e2\u00ee\u0219\u021b]+\s+\d{4})",
+        r"termen\s+limit[ăa][^0-9]{0,40}"
+        r"(\d{1,2}[./-]\d{1,2}[./-]\d{4}|\d{1,2}\s+[A-Za-z\u0103\u00e2\u00ee\u0219\u021b]+\s+\d{4})",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if not match:
+            continue
+        parsed = parse_deadline_to_iso(match.group(1))
+        if parsed:
+            return parsed
+    return None
 
 
 def _parse_job_cards(block_html: str) -> List[JobRecord]:
@@ -178,9 +198,9 @@ def fetch_bnr_jobs(settings: Settings) -> List[JobRecord]:
 
     for job in jobs:
         try:
-            pdf_url, details_text = _extract_pdf_and_text(settings, job.details_url)
+            pdf_url, details_text, direct_deadline = _extract_pdf_and_text(settings, job.details_url)
         except Exception:  # noqa: BLE001
-            pdf_url, details_text = "", ""
+            pdf_url, details_text, direct_deadline = "", "", None
         job.pdf_url = pdf_url
         job.details_text = details_text
         deadline_result = extract_application_deadline(
@@ -188,7 +208,7 @@ def fetch_bnr_jobs(settings: Settings) -> List[JobRecord]:
             title=job.title,
             body_text=details_text,
             attachment_text="",
-            fallback_deadline_iso=job.deadline_iso,
+            fallback_deadline_iso=direct_deadline or job.deadline_iso,
         )
         job.deadline_iso = deadline_result.deadline_iso
         job.expired = resolve_expired(job.deadline_iso)
