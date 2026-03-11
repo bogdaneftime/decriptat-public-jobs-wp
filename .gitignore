@@ -1,51 +1,68 @@
-# Wordpress - ignore core, configuration, examples, uploads and logs.
-# https://github.com/github/gitignore/blob/main/WordPress.gitignore
+############################
+# Environment / secrets
+############################
 
-# Core
-#
-# Note: if you want to stage/commit WP core files
-# you can delete this whole section/until Configuration.
-/wp-admin/
-/wp-content/index.php
-/wp-content/languages
-/wp-content/plugins/index.php
-/wp-content/themes/index.php
-/wp-includes/
-/index.php
-/license.txt
-/readme.html
-/wp-*.php
-/xmlrpc.php
+.env
+.env.*
+!.env.example
 
-# Configuration
-wp-config.php
+############################
+# Python
+############################
 
-# Example themes
-/wp-content/themes/twenty*/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
-# Example plugin
-/wp-content/plugins/hello.php
+############################
+# Python crawler state
+############################
 
-# Uploads
-/wp-content/uploads/
+crawlers/.state/
+*.sqlite
 
-# Log files
+############################
+# OS files
+############################
+
+.DS_Store
+Thumbs.db
+
+############################
+# Logs
+############################
+
 *.log
 
-# htaccess
-/.htaccess
+############################
+# Editor / IDE
+############################
 
-# Local environment
-.env
+.vscode/
+.idea/
 
-# All plugins
-#
-# Note: If you wish to whitelist plugins,
-# uncomment the next line
-#/wp-content/plugins
+############################
+# Temporary files
+############################
 
-# All themes
-#
-# Note: If you wish to whitelist themes,
-# uncomment the next line
-#/wp-content/themes
+*.tmp
+*.bak
+
+############################
+# Node (if ever used)
+############################
+
+node_modules/
+
+############################
+# WordPress runtime files
+############################
+
+wp-content/uploads/
+
+############################
+# Local documentation
+############################
+
+SPECS.md
