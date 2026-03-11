@@ -92,6 +92,20 @@ $institution_terms  = get_terms(
 		<?php
 		global $wp_query;
 		$sorted_posts = $wp_query->posts;
+		if ( function_exists( 'decriptat_pj_unique_posts' ) ) {
+			$sorted_posts = decriptat_pj_unique_posts( $sorted_posts );
+		}
+		if ( function_exists( 'decriptat_pj_job_matches_status' ) ) {
+			$sorted_posts = array_values(
+				array_filter(
+					$sorted_posts,
+					function ( $job_post ) use ( $selected_status ) {
+						$state = decriptat_pj_get_job_state( $job_post->ID );
+						return decriptat_pj_job_matches_status( $state, $selected_status );
+					}
+				)
+			);
+		}
 		if ( function_exists( 'decriptat_pj_sort_jobs' ) ) {
 			usort( $sorted_posts, 'decriptat_pj_sort_jobs' );
 		}

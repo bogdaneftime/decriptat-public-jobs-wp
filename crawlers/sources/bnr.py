@@ -11,8 +11,9 @@ from bs4 import BeautifulSoup, Tag
 
 from crawlers.common.classifier import classify_job
 from crawlers.common.config import Settings
+from crawlers.common.deadline_extractor import extract_application_deadline, resolve_expired
 from crawlers.common.models import JobRecord
-from crawlers.common.utils import is_expired, parse_deadline_to_iso, to_absolute_url
+from crawlers.common.utils import parse_deadline_to_iso, to_absolute_url
 
 BNR_LISTING_URL = "https://www.bnr.ro/3025-posturi-vacante"
 BNR_BLOCKS_URL = "https://www.bnr.ro/blocks"
@@ -145,7 +146,7 @@ def _parse_job_cards(block_html: str) -> List[JobRecord]:
                 location=location.strip(),
                 number_of_positions=number_of_positions,
                 deadline_iso=deadline_iso,
-                expired=is_expired(deadline_iso),
+                expired=resolve_expired(deadline_iso),
             )
         )
 
@@ -182,6 +183,15 @@ def fetch_bnr_jobs(settings: Settings) -> List[JobRecord]:
             pdf_url, details_text = "", ""
         job.pdf_url = pdf_url
         job.details_text = details_text
+        deadline_result = extract_application_deadline(
+            settings=settings,
+            title=job.title,
+            body_text=details_text,
+            attachment_text="",
+            fallback_deadline_iso=job.deadline_iso,
+        )
+        job.deadline_iso = deadline_result.deadline_iso
+        job.expired = resolve_expired(job.deadline_iso)
         result = classify_job(
             settings=settings,
             title=job.title,

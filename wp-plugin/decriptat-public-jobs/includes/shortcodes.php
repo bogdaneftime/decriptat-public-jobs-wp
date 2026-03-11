@@ -12,13 +12,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 function decriptat_pj_get_job_state( $post_id ) {
 	$deadline_raw = get_post_meta( $post_id, 'deadline', true );
 	$expired_meta = rest_sanitize_boolean( get_post_meta( $post_id, 'expired', true ) );
-	$today        = current_time( 'Y-m-d' );
+	$today_ts     = strtotime( current_time( 'Y-m-d' ) );
 	$is_expired   = false;
 	$is_active    = false;
 
 	if ( ! empty( $deadline_raw ) ) {
-		$is_expired = ( $deadline_raw < $today );
-		$is_active  = ! $is_expired;
+		$deadline_ts = strtotime( $deadline_raw );
+		if ( false !== $deadline_ts ) {
+			$is_expired = ( $deadline_ts < $today_ts );
+			$is_active  = ! $is_expired;
+		}
 	}
 
 	if ( $expired_meta ) {
@@ -39,6 +42,26 @@ function decriptat_pj_get_job_state( $post_id ) {
 		'label'      => $label,
 		'deadline'   => $deadline_raw,
 	);
+}
+
+/**
+ * Keep only distinct posts by post ID.
+ *
+ * @param array<int, WP_Post> $posts Posts list.
+ * @return array<int, WP_Post>
+ */
+function decriptat_pj_unique_posts( $posts ) {
+	$seen    = array();
+	$unique  = array();
+	foreach ( $posts as $post_item ) {
+		$post_id = (int) $post_item->ID;
+		if ( isset( $seen[ $post_id ] ) ) {
+			continue;
+		}
+		$seen[ $post_id ] = true;
+		$unique[]         = $post_item;
+	}
+	return $unique;
 }
 
 /**
@@ -160,7 +183,7 @@ function decriptat_pj_render_jobs_shortcode( $it_only = false ) {
 	}
 
 	$query = new WP_Query( $args );
-	$posts = $query->posts;
+	$posts = decriptat_pj_unique_posts( $query->posts );
 	$category_terms = get_terms(
 		array(
 			'taxonomy'   => 'job_category',

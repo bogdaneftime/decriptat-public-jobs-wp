@@ -44,8 +44,12 @@ The ADR crawler:
 
 - crawls listing + pagination pages
 - extracts details URL, title, publication date
-- keeps only recruitment announcements (concurs/examen/recrutare/ocupare post and transfer only in recruitment context)
-- skips obvious non-job notices (for example generic erata/corrigendum)
+- keeps only **new contest / new recruitment** announcements
+- excludes follow-up pages (rezultate, contestatii, interviu-stage pages, erata/corrigendum)
+- applies a two-step announcement classifier:
+  - deterministic keyword rules
+  - OpenAI fallback only when uncertain
+- conservative default: uncertain announcements are skipped
 - keeps only items inferred as year `2026`
 - extracts attachments and keeps links
 - attempts lightweight attachment text extraction:
@@ -54,7 +58,9 @@ The ADR crawler:
 - combines details page text + attachment labels + extracted attachment text for:
   - category classification
   - deadline extraction
-- detects deadline from Romanian deadline phrases and date patterns
+- deadline extraction also uses two-step strategy:
+  - deterministic phrase/date parsing
+  - OpenAI fallback only when rule result is unclear
 - sets `expired` from parsed deadline
 - publishes as `public_job` draft with:
   - title `[ADR] <title>`
@@ -69,6 +75,7 @@ The ADR crawler:
   - direct URL to single post
   - `?status=expired` filter
   - `?status=all` filter
+- Archive/shortcode rendering deduplicates posts by ID to avoid repeated cards.
 - Sorting:
   - active first
   - expired later when included
@@ -104,4 +111,10 @@ ADR:
 
 ```bash
 python crawlers/run_adr.py
+```
+
+## Tests
+
+```bash
+python -m unittest discover -s tests
 ```

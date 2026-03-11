@@ -10,14 +10,14 @@ from urllib.parse import urlparse
 import requests
 from bs4 import BeautifulSoup, Tag
 
+from crawlers.common.announcement_classifier import classify_announcement
 from crawlers.common.classifier import classify_job
 from crawlers.common.config import Settings
+from crawlers.common.deadline_extractor import extract_application_deadline, resolve_expired
 from crawlers.common.documents import extract_document_text
 from crawlers.common.models import AttachmentRecord, JobRecord
 from crawlers.common.utils import (
-    extract_deadline_iso,
     extract_first_iso_date,
-    is_expired,
     is_year,
     normalize_text,
     to_absolute_url,
@@ -198,10 +198,23 @@ def _build_job_from_entry(settings: Settings, entry: ListingEntry) -> Optional[J
             attachment_text_chunks.append(text[:6000])
     attachment_text = " ".join(attachment_text_chunks)
 
-    combined_text = " ".join(
-        part for part in [title, page_text, attachment_labels, attachment_text] if part
+    combined_text = " ".join(part for part in [title, page_text, attachment_labels, attachment_text] if part)
+    body_excerpt = combined_text[:2200]
+
+    announcement_decision = classify_announcement(
+        settings=settings,
+        title=title,
+        publication_date_iso=entry.published_date_iso,
+        body_excerpt=body_excerpt,
+        attachment_labels=attachment_labels,
     )
-    if not _is_recruitment_announcement(title, combined_text):
+    if "new_contest" != announcement_decision.label:
+        LOGGER.info(
+            "ADR skip announcement title=%s decision=%s source=%s",
+            title,
+            announcement_decision.label,
+            announcement_decision.source,
+        )
         return None
 
     published_date_iso = entry.published_date_iso or extract_first_iso_date(
@@ -212,8 +225,14 @@ def _build_job_from_entry(settings: Settings, entry: ListingEntry) -> Optional[J
     if not is_year(published_date_iso, TARGET_YEAR):
         return None
 
-    deadline_iso = extract_deadline_iso(title, page_text, attachment_text)
-    expired = is_expired(deadline_iso) if deadline_iso else False
+    deadline_result = extract_application_deadline(
+        settings=settings,
+        title=title,
+        body_text=page_text,
+        attachment_text=attachment_text,
+    )
+    deadline_iso = deadline_result.deadline_iso
+    expired = resolve_expired(deadline_iso)
     location = _extract_location(page_text)
 
     classification_result = classify_job(
@@ -265,44 +284,6 @@ def _extract_attachments(root: Tag, base_url: str) -> List[AttachmentRecord]:
         label = link.get_text(" ", strip=True) or "Document"
         attachments.append(AttachmentRecord(label=label, url=href))
     return attachments
-
-
-def _is_recruitment_announcement(title: str, details_text: str) -> bool:
-    text = normalize_text(f"{title} {details_text}")
-    strong_positive = (
-        "concurs",
-        "examen",
-        "ocupare post",
-        "ocuparea post",
-        "recrutare",
-        "angajare",
-        "selectie dosare",
-    )
-    negative = (
-        "erata",
-        "corrigendum",
-        "rectificare",
-        "comunicat",
-        "anunt important",
-    )
-
-    has_positive = any(token in text for token in strong_positive)
-    has_negative = any(token in text for token in negative)
-
-    transfer_tokens = ("transfer", "transfer la cerere")
-    transfer_context_tokens = ("post", "ocupare", "dosar", "concurs", "examen", "recrutare")
-    has_transfer = any(token in text for token in transfer_tokens)
-    transfer_is_recruitment = has_transfer and any(
-        token in text for token in transfer_context_tokens
-    )
-
-    if has_negative and not has_positive and not transfer_is_recruitment:
-        return False
-    if has_positive:
-        return True
-    if transfer_is_recruitment:
-        return True
-    return False
 
 
 def _extract_location(page_text: str) -> str:
