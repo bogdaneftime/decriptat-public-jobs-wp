@@ -72,7 +72,8 @@ function decriptat_pj_unique_posts( $posts ) {
 }
 
 /**
- * Keep only one visible job for equivalent entries (same source_url or title fallback).
+ * Keep only one visible job for equivalent entries.
+ * Priority: same source_url, then same institution + normalized title + publication date.
  *
  * @param array<int, WP_Post> $posts Posts list.
  * @return array<int, WP_Post>
@@ -84,14 +85,37 @@ function decriptat_pj_unique_jobs( $posts ) {
 	foreach ( $posts as $post_item ) {
 		$source_url = get_post_meta( $post_item->ID, 'source_url', true );
 		$key_source = ! empty( $source_url ) ? strtolower( trim( $source_url ) ) : '';
-		$key_title  = strtolower( trim( wp_strip_all_tags( get_the_title( $post_item->ID ) ) ) );
-		$key        = ! empty( $key_source ) ? 'source:' . $key_source : 'title:' . $key_title;
+		$title_raw  = wp_strip_all_tags( get_the_title( $post_item->ID ) );
+		$title_norm = strtolower( trim( $title_raw ) );
+		$title_norm = preg_replace( '/^\[[^\]]+\]\s*/', '', $title_norm );
+		$title_norm = preg_replace( '/\s*[-–]\s*bucuresti\s*$/u', '', $title_norm );
+		$title_norm = preg_replace( '/\s+/', ' ', $title_norm );
+		$title_norm = trim( $title_norm );
+
+		$institutions      = get_the_terms( $post_item->ID, 'institution' );
+		$institution_name  = '';
+		if ( ! is_wp_error( $institutions ) && ! empty( $institutions ) ) {
+			$institution_name = strtolower( trim( $institutions[0]->name ) );
+		}
+
+		$published_date = get_post_meta( $post_item->ID, 'published_date', true );
+		$published_key  = strtolower( trim( (string) $published_date ) );
+
+		$semantic_key       = 'sem:' . $institution_name . '|' . $title_norm . '|' . $published_key;
+		$semantic_key_loose = 'sem-loose:' . $institution_name . '|' . $title_norm;
+		$key          = ! empty( $key_source ) ? 'source:' . $key_source : $semantic_key;
 
 		if ( isset( $seen[ $key ] ) ) {
 			continue;
 		}
 
+		if ( isset( $seen[ $semantic_key ] ) || isset( $seen[ $semantic_key_loose ] ) ) {
+			continue;
+		}
+
 		$seen[ $key ] = true;
+		$seen[ $semantic_key ]       = true;
+		$seen[ $semantic_key_loose ] = true;
 		$unique[]     = $post_item;
 	}
 
