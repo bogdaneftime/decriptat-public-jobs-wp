@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup, Tag
 from crawlers.common.announcement_classifier import classify_announcement
 from crawlers.common.classifier import classify_job
 from crawlers.common.config import Settings
-from crawlers.common.deadline_extractor import extract_application_deadline, resolve_expired
+from crawlers.common.deadline_extractor import infer_dates, resolve_expired_with_publication
 from crawlers.common.documents import extract_document_text
 from crawlers.common.models import AttachmentRecord, JobRecord
 from crawlers.common.utils import (
@@ -222,17 +222,24 @@ def _build_job_from_entry(settings: Settings, entry: ListingEntry) -> Optional[J
         page_text,
         attachment_text,
     )
-    if not is_year(published_date_iso, TARGET_YEAR):
-        return None
-
-    deadline_result = extract_application_deadline(
+    dates_result = infer_dates(
         settings=settings,
         title=title,
         body_text=page_text,
         attachment_text=attachment_text,
+        fallback_published_iso=published_date_iso,
     )
-    deadline_iso = deadline_result.deadline_iso
-    expired = resolve_expired(deadline_iso)
+    published_date_iso = dates_result.published_date_iso
+    deadline_iso = dates_result.deadline_iso
+
+    if not is_year(published_date_iso, TARGET_YEAR):
+        return None
+
+    expired = resolve_expired_with_publication(
+        deadline_iso=deadline_iso,
+        published_date_iso=published_date_iso,
+        stale_days=30,
+    )
     location = _extract_location(page_text)
 
     classification_result = classify_job(

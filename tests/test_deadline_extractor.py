@@ -4,7 +4,11 @@ import unittest
 from pathlib import Path
 
 from crawlers.common.config import Settings
-from crawlers.common.deadline_extractor import extract_application_deadline
+from crawlers.common.deadline_extractor import (
+    extract_application_deadline,
+    extract_publication_date,
+    resolve_expired_with_publication,
+)
 
 
 def _settings_no_ai() -> Settings:
@@ -61,6 +65,23 @@ class DeadlineExtractorTests(unittest.TestCase):
             attachment_text="",
         )
         self.assertIsNone(result.deadline_iso)
+
+    def test_extracts_publication_date_from_publicare_hint(self) -> None:
+        result = extract_publication_date(
+            settings=self.settings,
+            title="Calendar concurs",
+            body_text="26.01.2026 Publicare anunt; 26-30.01.2026 Depunere dosare.",
+            attachment_text="",
+        )
+        self.assertEqual("2026-01-26", result.published_date_iso)
+
+    def test_marks_expired_if_published_older_than_30_days_without_deadline(self) -> None:
+        is_expired = resolve_expired_with_publication(
+            deadline_iso=None,
+            published_date_iso="2026-01-01",
+            stale_days=30,
+        )
+        self.assertTrue(is_expired)
 
 
 if __name__ == "__main__":

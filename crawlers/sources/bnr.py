@@ -1,19 +1,19 @@
 from __future__ import annotations
 
+import logging
 import re
 import time
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlparse
-import logging
 
 import requests
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup
 
 from crawlers.common.classifier import classify_job
 from crawlers.common.config import Settings
-from crawlers.common.deadline_extractor import extract_application_deadline, resolve_expired
+from crawlers.common.deadline_extractor import infer_dates, resolve_expired_with_publication
 from crawlers.common.models import JobRecord
-from crawlers.common.utils import parse_deadline_to_iso, to_absolute_url
+from crawlers.common.utils import extract_first_iso_date, parse_deadline_to_iso, to_absolute_url
 
 BNR_LISTING_URL = "https://www.bnr.ro/3025-posturi-vacante"
 BNR_BLOCKS_URL = "https://www.bnr.ro/blocks"
@@ -77,7 +77,10 @@ def _parse_positions(text: str) -> Optional[int]:
     return int(match.group(1)) if match else None
 
 
-def _extract_pdf_and_text(settings: Settings, details_url: str) -> Tuple[str, str, Optional[str]]:
+def _extract_pdf_and_text(
+    settings: Settings,
+    details_url: str,
+) -> Tuple[str, str, Optional[str], Optional[str]]:
     response = _request_with_retry(settings, details_url)
     soup = BeautifulSoup(response.text, "lxml")
 
@@ -94,15 +97,38 @@ def _extract_pdf_and_text(settings: Settings, details_url: str) -> Tuple[str, st
         details_text = details_text[:5000]
 
     direct_deadline = _extract_bnr_deadline_from_soup(soup)
-    return pdf_url, details_text, direct_deadline
+    published_date = _extract_bnr_published_date(details_url, details_text)
+    return pdf_url, details_text, direct_deadline, published_date
 
 
 def _extract_bnr_deadline_from_soup(soup: BeautifulSoup) -> Optional[str]:
+    # Strong path: specific row from BNR vacancy details.
+    for row in soup.select("p.petrol-grey"):
+        row_text = row.get_text(" ", strip=True)
+        if not row_text:
+            continue
+        lowered = row_text.lower()
+        if "primirea aplica" in lowered or "termen limit" in lowered:
+            span = row.find("span")
+            date_candidate = span.get_text(" ", strip=True) if span else ""
+            if not date_candidate:
+                match = re.search(
+                    r"(\d{1,2}[./-]\d{1,2}[./-]\d{4}|\d{1,2}\s+[A-Za-z\u0103\u00e2\u00ee\u0219\u021b]+\s+\d{4})",
+                    row_text,
+                    re.IGNORECASE,
+                )
+                if match:
+                    date_candidate = match.group(1)
+            parsed = parse_deadline_to_iso(date_candidate)
+            if parsed:
+                return parsed
+
+    # Backup path: plain text regex.
     text = re.sub(r"\s+", " ", soup.get_text(" ", strip=True))
     patterns = (
-        r"termen\s+limit[ăa]\s+pentru\s+primirea\s+aplica[țt]iilor[^0-9]{0,40}"
+        r"termen\s+limit[\u0103a]\s+pentru\s+primirea\s+aplica[\u021bt]iilor[^0-9]{0,40}"
         r"(\d{1,2}[./-]\d{1,2}[./-]\d{4}|\d{1,2}\s+[A-Za-z\u0103\u00e2\u00ee\u0219\u021b]+\s+\d{4})",
-        r"termen\s+limit[ăa][^0-9]{0,40}"
+        r"termen\s+limit[\u0103a][^0-9]{0,40}"
         r"(\d{1,2}[./-]\d{1,2}[./-]\d{4}|\d{1,2}\s+[A-Za-z\u0103\u00e2\u00ee\u0219\u021b]+\s+\d{4})",
     )
     for pattern in patterns:
@@ -115,6 +141,13 @@ def _extract_bnr_deadline_from_soup(soup: BeautifulSoup) -> Optional[str]:
     return None
 
 
+def _extract_bnr_published_date(details_url: str, details_text: str) -> Optional[str]:
+    path_date = re.search(r"/(\d{4})-(\d{2})-(\d{2})-", details_url)
+    if path_date:
+        return f"{path_date.group(1)}-{path_date.group(2)}-{path_date.group(3)}"
+    return extract_first_iso_date(details_text)
+
+
 def _parse_job_cards(block_html: str) -> List[JobRecord]:
     soup = BeautifulSoup(block_html, "lxml")
     jobs: List[JobRecord] = []
@@ -124,7 +157,6 @@ def _parse_job_cards(block_html: str) -> List[JobRecord]:
         if len(cols) < 5:
             continue
 
-        # Keep only vacancy rows that contain the deadline label.
         card_text = card.get_text(" ", strip=True).lower()
         if "termen limit" not in card_text:
             continue
@@ -166,7 +198,7 @@ def _parse_job_cards(block_html: str) -> List[JobRecord]:
                 location=location.strip(),
                 number_of_positions=number_of_positions,
                 deadline_iso=deadline_iso,
-                expired=resolve_expired(deadline_iso),
+                expired=resolve_expired_with_publication(deadline_iso, None, stale_days=30),
             )
         )
 
@@ -198,20 +230,32 @@ def fetch_bnr_jobs(settings: Settings) -> List[JobRecord]:
 
     for job in jobs:
         try:
-            pdf_url, details_text, direct_deadline = _extract_pdf_and_text(settings, job.details_url)
+            pdf_url, details_text, direct_deadline, published_date = _extract_pdf_and_text(
+                settings,
+                job.details_url,
+            )
         except Exception:  # noqa: BLE001
-            pdf_url, details_text, direct_deadline = "", "", None
+            pdf_url, details_text, direct_deadline, published_date = "", "", None, None
+
         job.pdf_url = pdf_url
         job.details_text = details_text
-        deadline_result = extract_application_deadline(
+
+        dates_result = infer_dates(
             settings=settings,
             title=job.title,
             body_text=details_text,
             attachment_text="",
+            fallback_published_iso=published_date,
             fallback_deadline_iso=direct_deadline or job.deadline_iso,
         )
-        job.deadline_iso = deadline_result.deadline_iso
-        job.expired = resolve_expired(job.deadline_iso)
+        job.deadline_iso = dates_result.deadline_iso
+        job.published_date_iso = dates_result.published_date_iso or published_date
+        job.expired = resolve_expired_with_publication(
+            deadline_iso=job.deadline_iso,
+            published_date_iso=job.published_date_iso,
+            stale_days=30,
+        )
+
         result = classify_job(
             settings=settings,
             title=job.title,
