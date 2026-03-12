@@ -117,7 +117,6 @@ $institution_terms  = get_terms(
 		<div class="decriptat-pj-job-grid">
 			<?php
 			foreach ( $sorted_posts as $job_post ) :
-				setup_postdata( $job_post );
 				$post_id        = $job_post->ID;
 				$source_url     = get_post_meta( $post_id, 'source_url', true );
 				$deadline       = get_post_meta( $post_id, 'deadline', true );
@@ -136,7 +135,7 @@ $institution_terms  = get_terms(
 				$institutions   = get_the_terms( $post_id, 'institution' );
 				$card_classes   = $state['is_expired'] ? 'decriptat-pj-job-card is-expired' : 'decriptat-pj-job-card';
 				?>
-				<article id="post-<?php the_ID(); ?>" <?php post_class( $card_classes ); ?>>
+				<article id="post-<?php echo esc_attr( $post_id ); ?>" <?php post_class( $card_classes, $post_id ); ?>>
 					<div class="decriptat-pj-card-top">
 						<?php if ( ! empty( $state['label'] ) ) : ?>
 							<span class="decriptat-pj-status-badge <?php echo $state['is_expired'] ? 'is-expired' : 'is-active'; ?>">
@@ -149,11 +148,11 @@ $institution_terms  = get_terms(
 					</div>
 
 					<h2 class="decriptat-pj-card-title">
-						<a href="<?php the_permalink(); ?>"><?php the_title(); ?></a>
+						<a href="<?php echo esc_url( get_permalink( $post_id ) ); ?>"><?php echo esc_html( get_the_title( $post_id ) ); ?></a>
 					</h2>
 
-					<?php if ( has_excerpt() ) : ?>
-						<div class="decriptat-pj-card-excerpt"><?php the_excerpt(); ?></div>
+					<?php if ( has_excerpt( $post_id ) ) : ?>
+						<div class="decriptat-pj-card-excerpt"><?php echo wp_kses_post( get_the_excerpt( $post_id ) ); ?></div>
 					<?php endif; ?>
 
 					<div class="decriptat-pj-meta-chips">
@@ -179,7 +178,7 @@ $institution_terms  = get_terms(
 							<span class="decriptat-pj-published"><?php echo esc_html( sprintf( __( 'Publicat: %s', 'decriptat-public-jobs' ), decriptat_pj_format_date( $published_date ) ) ); ?></span>
 						<?php endif; ?>
 						<div class="decriptat-pj-card-links">
-							<a href="<?php the_permalink(); ?>"><?php esc_html_e( 'Vezi detalii', 'decriptat-public-jobs' ); ?></a>
+							<a href="<?php echo esc_url( get_permalink( $post_id ) ); ?>"><?php esc_html_e( 'Vezi detalii', 'decriptat-public-jobs' ); ?></a>
 							<?php if ( ! empty( $source_url ) ) : ?>
 								<a href="<?php echo esc_url( $source_url ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Sursa oficiala', 'decriptat-public-jobs' ); ?></a>
 							<?php endif; ?>
@@ -187,7 +186,6 @@ $institution_terms  = get_terms(
 					</div>
 				</article>
 			<?php endforeach; ?>
-			<?php wp_reset_postdata(); ?>
 		</div>
 		<?php else : ?>
 		<section class="decriptat-pj-empty-state">
