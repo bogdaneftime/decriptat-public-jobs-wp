@@ -238,7 +238,6 @@ def _build_job_from_entry(settings: Settings, entry: ListingEntry) -> Optional[J
     expired = resolve_expired_with_publication(
         deadline_iso=deadline_iso,
         published_date_iso=published_date_iso,
-        stale_days=30,
     )
     location = _extract_location(page_text)
 

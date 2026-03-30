@@ -198,7 +198,7 @@ def _parse_job_cards(block_html: str) -> List[JobRecord]:
                 location=location.strip(),
                 number_of_positions=number_of_positions,
                 deadline_iso=deadline_iso,
-                expired=resolve_expired_with_publication(deadline_iso, None, stale_days=30),
+                expired=resolve_expired_with_publication(deadline_iso, None),
             )
         )
 
@@ -253,7 +253,6 @@ def fetch_bnr_jobs(settings: Settings) -> List[JobRecord]:
         job.expired = resolve_expired_with_publication(
             deadline_iso=job.deadline_iso,
             published_date_iso=job.published_date_iso,
-            stale_days=30,
         )
 
         result = classify_job(

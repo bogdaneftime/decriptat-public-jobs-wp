@@ -4,34 +4,79 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
+ * Parse a job-related date string into a timestamp.
+ *
+ * @param string $raw_date Raw date from meta.
+ * @return int|false
+ */
+function decriptat_pj_parse_job_timestamp( $raw_date ) {
+	if ( empty( $raw_date ) ) {
+		return false;
+	}
+
+	return strtotime( $raw_date );
+}
+
+/**
+ * Determine if a timestamp falls in the current or previous month.
+ *
+ * @param int $timestamp Unix timestamp.
+ * @return bool
+ */
+function decriptat_pj_is_in_recent_job_window( $timestamp ) {
+	$current_month = current_time( 'Y-m' );
+	$previous_month = wp_date( 'Y-m', strtotime( '-1 month', current_time( 'timestamp' ) ) );
+	$target_month   = wp_date( 'Y-m', $timestamp );
+
+	return in_array( $target_month, array( $current_month, $previous_month ), true );
+}
+
+/**
+ * Resolve the fallback reference date used when application period is unknown.
+ *
+ * @param int $post_id Post ID.
+ * @return int|false
+ */
+function decriptat_pj_get_fallback_activity_timestamp( $post_id ) {
+	$published_timestamp = decriptat_pj_parse_job_timestamp( get_post_meta( $post_id, 'published_date', true ) );
+	if ( false !== $published_timestamp ) {
+		return $published_timestamp;
+	}
+
+	$post_timestamp = get_post_timestamp( $post_id, 'date' );
+	if ( false !== $post_timestamp ) {
+		return $post_timestamp;
+	}
+
+	return false;
+}
+
+/**
  * Get status labels and visual state for a public job.
  *
  * @param int $post_id Post ID.
  * @return array<string, mixed>
  */
 function decriptat_pj_get_job_state( $post_id ) {
-	$deadline_raw = get_post_meta( $post_id, 'deadline', true );
-	$expired_meta = rest_sanitize_boolean( get_post_meta( $post_id, 'expired', true ) );
-	$today_ts     = strtotime( current_time( 'Y-m-d' ) );
-	$is_expired   = false;
-	$is_active    = true;
-	$has_deadline = false;
+	$deadline_raw        = get_post_meta( $post_id, 'deadline', true );
+	$expired_meta        = rest_sanitize_boolean( get_post_meta( $post_id, 'expired', true ) );
+	$today_ts            = strtotime( current_time( 'Y-m-d' ) );
+	$deadline_ts         = decriptat_pj_parse_job_timestamp( $deadline_raw );
+	$fallback_timestamp  = decriptat_pj_get_fallback_activity_timestamp( $post_id );
+	$is_expired          = false;
+	$is_active           = true;
 
-	if ( ! empty( $deadline_raw ) ) {
-		$deadline_ts = strtotime( $deadline_raw );
-		if ( false !== $deadline_ts ) {
-			$has_deadline = true;
-			$is_expired   = ( $deadline_ts < $today_ts );
-			$is_active    = ! $is_expired;
-		} elseif ( $expired_meta ) {
-			// Respect explicit expired flag only when deadline meta exists but is malformed.
-			$is_expired = true;
-			$is_active  = false;
-		}
-	}
-
-	// If no deadline was found at all, keep the listing active by default.
-	if ( $has_deadline && $expired_meta ) {
+	if ( false !== $deadline_ts ) {
+		$is_expired = ( $deadline_ts < $today_ts );
+		$is_active  = ! $is_expired;
+	} elseif ( $expired_meta ) {
+		// Respect explicit expired flag when upstream marks the listing as closed.
+		$is_expired = true;
+		$is_active  = false;
+	} elseif ( false !== $fallback_timestamp ) {
+		$is_active  = decriptat_pj_is_in_recent_job_window( $fallback_timestamp );
+		$is_expired = ! $is_active;
+	} else {
 		$is_expired = true;
 		$is_active  = false;
 	}

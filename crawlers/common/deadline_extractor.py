@@ -4,7 +4,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 from typing import Optional
 
 import requests
@@ -332,19 +332,31 @@ def resolve_expired(deadline_iso: Optional[str]) -> bool:
         return False
 
 
+def _is_in_current_or_previous_month(target_date: date, reference_date: date) -> bool:
+    current_month = (reference_date.year, reference_date.month)
+    if reference_date.month == 1:
+        previous_month = (reference_date.year - 1, 12)
+    else:
+        previous_month = (reference_date.year, reference_date.month - 1)
+    target_month = (target_date.year, target_date.month)
+    return target_month == current_month or target_month == previous_month
+
+
 def resolve_expired_with_publication(
     deadline_iso: Optional[str],
     published_date_iso: Optional[str],
-    stale_days: int = 30,
+    today: Optional[date] = None,
 ) -> bool:
     if resolve_expired(deadline_iso):
         return True
     if deadline_iso:
         return False
     if not published_date_iso:
-        return False
+        return True
     try:
         published_date = date.fromisoformat(published_date_iso)
     except ValueError:
-        return False
-    return published_date < (date.today() - timedelta(days=stale_days))
+        return True
+
+    reference_date = today or date.today()
+    return not _is_in_current_or_previous_month(published_date, reference_date)
