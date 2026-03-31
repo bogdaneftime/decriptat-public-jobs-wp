@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from datetime import date
 from pathlib import Path
 
 from crawlers.common.config import Settings
@@ -75,11 +76,27 @@ class DeadlineExtractorTests(unittest.TestCase):
         )
         self.assertEqual("2026-01-26", result.published_date_iso)
 
-    def test_marks_expired_if_published_older_than_30_days_without_deadline(self) -> None:
+    def test_marks_expired_if_publication_is_older_than_previous_month_without_deadline(self) -> None:
         is_expired = resolve_expired_with_publication(
             deadline_iso=None,
             published_date_iso="2026-01-01",
-            stale_days=30,
+            today=date(2026, 3, 30),
+        )
+        self.assertTrue(is_expired)
+
+    def test_keeps_active_if_publication_is_in_previous_month_without_deadline(self) -> None:
+        is_expired = resolve_expired_with_publication(
+            deadline_iso=None,
+            published_date_iso="2026-02-05",
+            today=date(2026, 3, 30),
+        )
+        self.assertFalse(is_expired)
+
+    def test_marks_expired_if_publication_is_unknown_without_deadline(self) -> None:
+        is_expired = resolve_expired_with_publication(
+            deadline_iso=None,
+            published_date_iso=None,
+            today=date(2026, 3, 30),
         )
         self.assertTrue(is_expired)
 
