@@ -19,6 +19,7 @@ require_once DECRIPTAT_PJ_PLUGIN_DIR . 'includes/post-types.php';
 require_once DECRIPTAT_PJ_PLUGIN_DIR . 'includes/meta.php';
 require_once DECRIPTAT_PJ_PLUGIN_DIR . 'includes/templates.php';
 require_once DECRIPTAT_PJ_PLUGIN_DIR . 'includes/shortcodes.php';
+require_once DECRIPTAT_PJ_PLUGIN_DIR . 'includes/admin.php';
 
 /**
  * Ensure rewrite rules are refreshed when plugin is activated.
