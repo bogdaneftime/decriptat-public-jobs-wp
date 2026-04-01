@@ -50,6 +50,10 @@ function decriptat_pj_render_admin_column( $column_name, $post_id ) {
 			echo '<br /><small>' . esc_html__( 'Setat manual', 'decriptat-public-jobs' ) . '</small>';
 		}
 
+		echo '<div class="hidden" id="decriptat-pj-status-data-' . esc_attr( $post_id ) . '">';
+		echo '<span class="decriptat-pj-manual-active-value">' . esc_html( $state['is_active'] ? '1' : '0' ) . '</span>';
+		echo '</div>';
+
 		return;
 	}
 
@@ -80,6 +84,71 @@ function decriptat_pj_render_admin_column( $column_name, $post_id ) {
 	}
 }
 add_action( 'manage_public_job_posts_custom_column', 'decriptat_pj_render_admin_column', 10, 2 );
+
+/**
+ * Render quick edit fields for public jobs.
+ *
+ * @param string $column_name Column name.
+ * @param string $post_type   Post type.
+ */
+function decriptat_pj_quick_edit_status_field( $column_name, $post_type ) {
+	if ( 'public_job' !== $post_type || 'decriptat_pj_status' !== $column_name ) {
+		return;
+	}
+
+	wp_nonce_field( 'decriptat_pj_quick_edit_status', 'decriptat_pj_quick_edit_status_nonce' );
+	?>
+	<fieldset class="inline-edit-col-right">
+		<div class="inline-edit-col">
+			<label class="alignleft">
+				<span class="title"><?php esc_html_e( 'Status job', 'decriptat-public-jobs' ); ?></span>
+				<span class="input-text-wrap">
+					<label>
+						<input type="checkbox" name="decriptat_pj_manual_is_active_quick" value="1" />
+						<?php esc_html_e( 'Job activ', 'decriptat-public-jobs' ); ?>
+					</label>
+				</span>
+			</label>
+		</div>
+	</fieldset>
+	<?php
+}
+add_action( 'quick_edit_custom_box', 'decriptat_pj_quick_edit_status_field', 10, 2 );
+
+/**
+ * Enqueue admin script for quick edit status sync.
+ *
+ * @param string $hook_suffix Admin hook suffix.
+ */
+function decriptat_pj_admin_enqueue_scripts( $hook_suffix ) {
+	if ( 'edit.php' !== $hook_suffix ) {
+		return;
+	}
+
+	$screen = get_current_screen();
+	if ( ! $screen || 'public_job' !== $screen->post_type ) {
+		return;
+	}
+
+	wp_add_inline_script(
+		'inline-edit-post',
+		"(function($){\n" .
+		"if(typeof inlineEditPost === 'undefined'){return;}\n" .
+		"var wpInlineEdit = inlineEditPost.edit;\n" .
+		"inlineEditPost.edit = function(id){\n" .
+		"\twpInlineEdit.apply(this, arguments);\n" .
+		"\tvar postId = 0;\n" .
+		"\tif(typeof id === 'object'){ postId = parseInt(this.getId(id), 10); } else { postId = parseInt(id, 10); }\n" .
+		"\tif(!postId){ return; }\n" .
+		"\tvar editRow = $('#edit-' + postId);\n" .
+		"\tvar postRow = $('#post-' + postId);\n" .
+		"\tvar value = postRow.find('.decriptat-pj-manual-active-value').text();\n" .
+		"\teditRow.find('input[name=\"decriptat_pj_manual_is_active_quick\"]').prop('checked', value === '1');\n" .
+		"};\n" .
+		"})(jQuery);"
+	);
+}
+add_action( 'admin_enqueue_scripts', 'decriptat_pj_admin_enqueue_scripts' );
 
 /**
  * Add a status filter dropdown in the public jobs admin list.
@@ -183,6 +252,34 @@ function decriptat_pj_handle_bulk_actions( $redirect_to, $doaction, $post_ids ) 
 	);
 }
 add_filter( 'handle_bulk_actions-edit-public_job', 'decriptat_pj_handle_bulk_actions', 10, 3 );
+
+/**
+ * Save quick edit status changes for public jobs.
+ *
+ * @param int $post_id Post ID.
+ */
+function decriptat_pj_save_quick_edit_status( $post_id ) {
+	if ( ! isset( $_POST['decriptat_pj_quick_edit_status_nonce'] ) ) {
+		return;
+	}
+
+	if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['decriptat_pj_quick_edit_status_nonce'] ) ), 'decriptat_pj_quick_edit_status' ) ) {
+		return;
+	}
+
+	if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+		return;
+	}
+
+	if ( 'public_job' !== get_post_type( $post_id ) || ! current_user_can( 'edit_post', $post_id ) ) {
+		return;
+	}
+
+	$manual_is_active = isset( $_POST['decriptat_pj_manual_is_active_quick'] );
+	update_post_meta( $post_id, 'manual_is_active', $manual_is_active ? 1 : 0 );
+	update_post_meta( $post_id, 'expired', $manual_is_active ? 0 : 1 );
+}
+add_action( 'save_post_public_job', 'decriptat_pj_save_quick_edit_status', 20 );
 
 /**
  * Show a notice after public job bulk updates.
