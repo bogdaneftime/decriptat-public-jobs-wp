@@ -60,16 +60,16 @@ function decriptat_pj_get_fallback_activity_timestamp( $post_id ) {
 function decriptat_pj_get_job_state( $post_id ) {
 	$deadline_raw        = get_post_meta( $post_id, 'deadline', true );
 	$expired_meta        = rest_sanitize_boolean( get_post_meta( $post_id, 'expired', true ) );
-	$manual_override     = rest_sanitize_boolean( get_post_meta( $post_id, 'manual_status_enabled', true ) );
 	$manual_is_active    = get_post_meta( $post_id, 'manual_is_active', true );
-	$manual_is_active    = '' === $manual_is_active ? true : rest_sanitize_boolean( $manual_is_active );
+	$has_manual_status   = '' !== $manual_is_active;
+	$manual_is_active    = $has_manual_status ? rest_sanitize_boolean( $manual_is_active ) : true;
 	$today_ts            = strtotime( current_time( 'Y-m-d' ) );
 	$deadline_ts         = decriptat_pj_parse_job_timestamp( $deadline_raw );
 	$fallback_timestamp  = decriptat_pj_get_fallback_activity_timestamp( $post_id );
 	$is_expired          = false;
 	$is_active           = true;
 
-	if ( $manual_override ) {
+	if ( $has_manual_status ) {
 		$is_active  = $manual_is_active;
 		$is_expired = ! $manual_is_active;
 	} elseif ( false !== $deadline_ts ) {

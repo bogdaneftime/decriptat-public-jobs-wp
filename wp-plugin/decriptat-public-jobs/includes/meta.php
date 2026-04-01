@@ -76,18 +76,6 @@ function decriptat_pj_register_meta() {
 
 	register_post_meta(
 		'public_job',
-		'manual_status_enabled',
-		array(
-			'type'              => 'boolean',
-			'single'            => true,
-			'show_in_rest'      => true,
-			'sanitize_callback' => 'rest_sanitize_boolean',
-			'default'           => false,
-		)
-	);
-
-	register_post_meta(
-		'public_job',
 		'manual_is_active',
 		array(
 			'type'              => 'boolean',
@@ -121,18 +109,16 @@ add_action( 'add_meta_boxes', 'decriptat_pj_add_status_meta_box' );
  * @param WP_Post $post Current post object.
  */
 function decriptat_pj_render_status_meta_box( $post ) {
-	$manual_status_enabled = rest_sanitize_boolean( get_post_meta( $post->ID, 'manual_status_enabled', true ) );
 	$manual_is_active      = get_post_meta( $post->ID, 'manual_is_active', true );
-	$manual_is_active      = '' === $manual_is_active ? true : rest_sanitize_boolean( $manual_is_active );
+	if ( '' === $manual_is_active ) {
+		$expired_meta      = rest_sanitize_boolean( get_post_meta( $post->ID, 'expired', true ) );
+		$manual_is_active  = ! $expired_meta;
+	} else {
+		$manual_is_active = rest_sanitize_boolean( $manual_is_active );
+	}
 
 	wp_nonce_field( 'decriptat_pj_save_status_meta_box', 'decriptat_pj_status_meta_box_nonce' );
 	?>
-	<p>
-		<label>
-			<input type="checkbox" name="decriptat_pj_manual_status_enabled" value="1" <?php checked( $manual_status_enabled ); ?> />
-			<?php esc_html_e( 'Seteaza manual statusul acestui job', 'decriptat-public-jobs' ); ?>
-		</label>
-	</p>
 	<p>
 		<label>
 			<input type="checkbox" name="decriptat_pj_manual_is_active" value="1" <?php checked( $manual_is_active ); ?> />
@@ -140,7 +126,7 @@ function decriptat_pj_render_status_meta_box( $post ) {
 		</label>
 	</p>
 	<p class="description">
-		<?php esc_html_e( 'Daca lasi prima bifa debifata, statusul este calculat automat din termen si datele disponibile.', 'decriptat-public-jobs' ); ?>
+		<?php esc_html_e( 'Daca debifezi, jobul este tratat ca expirat si apare doar in filtrele pentru joburi expirate.', 'decriptat-public-jobs' ); ?>
 	</p>
 	<?php
 }
@@ -167,10 +153,10 @@ function decriptat_pj_save_status_meta_box( $post_id ) {
 		return;
 	}
 
-	$manual_status_enabled = isset( $_POST['decriptat_pj_manual_status_enabled'] );
 	$manual_is_active      = isset( $_POST['decriptat_pj_manual_is_active'] );
 
-	update_post_meta( $post_id, 'manual_status_enabled', $manual_status_enabled ? 1 : 0 );
 	update_post_meta( $post_id, 'manual_is_active', $manual_is_active ? 1 : 0 );
+	update_post_meta( $post_id, 'expired', $manual_is_active ? 0 : 1 );
+	delete_post_meta( $post_id, 'manual_status_enabled' );
 }
 add_action( 'save_post_public_job', 'decriptat_pj_save_status_meta_box' );
