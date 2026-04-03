@@ -32,7 +32,7 @@ function decriptat_pj_format_date( $raw_date ) {
 		return $raw_date;
 	}
 
-	return wp_date( get_option( 'date_format' ), $timestamp );
+	return wp_date( 'd-m-Y', $timestamp );
 }
 
 /**

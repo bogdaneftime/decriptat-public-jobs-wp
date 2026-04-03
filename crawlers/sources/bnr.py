@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 import logging
 import re
 import time
@@ -17,8 +18,6 @@ from crawlers.common.utils import extract_first_iso_date, parse_deadline_to_iso,
 
 BNR_LISTING_URL = "https://www.bnr.ro/3025-posturi-vacante"
 BNR_BLOCKS_URL = "https://www.bnr.ro/blocks"
-TARGET_DEADLINE_YEAR = 2026
-MIN_DEADLINE_ISO = "2026-01-01"
 MAX_JOBS = 15
 LOGGER = logging.getLogger(__name__)
 
@@ -151,6 +150,7 @@ def _extract_bnr_published_date(details_url: str, details_text: str) -> Optional
 def _parse_job_cards(block_html: str) -> List[JobRecord]:
     soup = BeautifulSoup(block_html, "lxml")
     jobs: List[JobRecord] = []
+    today_iso = date.today().isoformat()
 
     for card in soup.select(".row-vpost"):
         cols = card.select(".row > div")
@@ -184,9 +184,7 @@ def _parse_job_cards(block_html: str) -> List[JobRecord]:
 
         if not deadline_iso:
             continue
-        if int(deadline_iso[:4]) != TARGET_DEADLINE_YEAR:
-            continue
-        if deadline_iso < MIN_DEADLINE_ISO:
+        if deadline_iso <= today_iso:
             continue
 
         jobs.append(
