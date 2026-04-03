@@ -21,6 +21,7 @@ class WordPressClient:
         self.settings = settings
         self.base_api = f"{self.settings.wp_base_url}/wp-json/wp/v2"
         self.session = requests.Session()
+        self._source_url_cache: dict[str, int] = {}
         self.session.headers.update(
             {
                 "Accept": "application/json",
@@ -75,6 +76,41 @@ class WordPressClient:
         term_data = post_resp.json()
         return int(term_data["id"])
 
+    def find_job_post_id_by_source_url(self, source_url: str) -> Optional[int]:
+        normalized_url = (source_url or "").strip()
+        if not normalized_url:
+            return None
+
+        if normalized_url in self._source_url_cache:
+            return self._source_url_cache[normalized_url]
+
+        page = 1
+        statuses = "draft,publish,pending,future,private"
+
+        while True:
+            response = self._request(
+                "GET",
+                f"/public_job?per_page=100&page={page}&status={statuses}&context=edit",
+            )
+            response.raise_for_status()
+            posts = response.json()
+            if not posts:
+                return None
+
+            for post in posts:
+                meta = post.get("meta", {})
+                if not isinstance(meta, dict):
+                    continue
+                if str(meta.get("source_url", "")).strip() == normalized_url:
+                    post_id = int(post["id"])
+                    self._source_url_cache[normalized_url] = post_id
+                    return post_id
+
+            total_pages = int(response.headers.get("X-WP-TotalPages", "1"))
+            if page >= total_pages:
+                return None
+            page += 1
+
     def create_job_post(self, job: JobRecord) -> int:
         institution_name = job.institution_name or "Banca Na\u021bional\u0103 a Rom\u00e2niei"
         institution_id = self.ensure_term("institution", institution_name)
@@ -100,7 +136,9 @@ class WordPressClient:
         response = self._request("POST", "/public_job", json=payload)
         response.raise_for_status()
         data = response.json()
-        return int(data["id"])
+        post_id = int(data["id"])
+        self._source_url_cache[job.details_url] = post_id
+        return post_id
 
 
 def _build_title(job: JobRecord) -> str:

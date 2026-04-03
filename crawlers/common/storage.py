@@ -44,6 +44,21 @@ class SeenStorage:
         ).fetchone()
         return row is not None
 
+    def has_source_url(self, source_url: str) -> bool:
+        row = self._conn.execute(
+            "SELECT source_url FROM seen WHERE source_url = ? LIMIT 1", (source_url,)
+        ).fetchone()
+        return row is not None
+
+    def get_wp_post_id_by_source_url(self, source_url: str) -> Optional[int]:
+        row = self._conn.execute(
+            "SELECT wp_post_id FROM seen WHERE source_url = ? LIMIT 1", (source_url,)
+        ).fetchone()
+        if row is None:
+            return None
+        value = row["wp_post_id"]
+        return int(value) if value is not None else None
+
     def upsert(
         self,
         hash_value: str,
@@ -52,6 +67,21 @@ class SeenStorage:
         wp_post_id: Optional[int],
     ) -> None:
         now_iso = datetime.now(timezone.utc).isoformat()
+        existing_by_url = self._conn.execute(
+            "SELECT hash FROM seen WHERE source_url = ? LIMIT 1", (source_url,)
+        ).fetchone()
+        if existing_by_url is not None:
+            self._conn.execute(
+                """
+                UPDATE seen
+                SET hash = ?, source = ?, wp_post_id = ?, last_seen_at = ?
+                WHERE source_url = ?
+                """,
+                (hash_value, source, wp_post_id, now_iso, source_url),
+            )
+            self._conn.commit()
+            return
+
         self._conn.execute(
             """
             INSERT INTO seen (hash, source, source_url, wp_post_id, last_seen_at)

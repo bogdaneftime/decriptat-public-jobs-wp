@@ -44,7 +44,18 @@ def main() -> int:
                 job.details_url,
                 None,
             )
-            if storage.has_hash(hash_value):
+            if storage.has_hash(hash_value) or storage.has_source_url(job.details_url):
+                skipped_seen += 1
+                continue
+
+            existing_post_id = wp.find_job_post_id_by_source_url(job.details_url)
+            if existing_post_id is not None:
+                storage.upsert(
+                    hash_value=hash_value,
+                    source=job.source,
+                    source_url=job.details_url,
+                    wp_post_id=existing_post_id,
+                )
                 skipped_seen += 1
                 continue
 
