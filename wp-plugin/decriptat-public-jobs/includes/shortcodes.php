@@ -700,7 +700,8 @@ function decriptat_pj_render_jobs_shortcode( $it_only = false ) {
 							'show_links'   => false,
 						)
 					);
-				<?php endforeach; ?>
+				endforeach;
+				?>
 			</div>
 		<?php else : ?>
 			<p><?php esc_html_e( 'Nu exista joburi disponibile momentan.', 'decriptat-public-jobs' ); ?></p>
