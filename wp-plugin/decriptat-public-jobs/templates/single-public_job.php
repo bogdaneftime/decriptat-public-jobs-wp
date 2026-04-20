@@ -27,6 +27,9 @@ get_header();
 				$primary_category = $job_categories[0]->name;
 			}
 			$institutions   = get_the_terms( $post_id, 'institution' );
+			$city_name      = function_exists( 'decriptat_pj_get_job_city_name' ) ? decriptat_pj_get_job_city_name( $post_id ) : '';
+			$freshness_label = function_exists( 'decriptat_pj_get_job_freshness_label' ) ? decriptat_pj_get_job_freshness_label( $post_id ) : '';
+			$countdown_label = function_exists( 'decriptat_pj_get_deadline_countdown_label' ) ? decriptat_pj_get_deadline_countdown_label( $deadline, $state ) : '';
 			?>
 			<article id="post-<?php the_ID(); ?>" <?php post_class( 'decriptat-pj-job-single' ); ?>>
 				<header class="decriptat-pj-single-header">
@@ -39,9 +42,24 @@ get_header();
 						<?php if ( $is_it ) : ?>
 							<span class="decriptat-pj-chip"><?php esc_html_e( 'IT', 'decriptat-public-jobs' ); ?></span>
 						<?php endif; ?>
+						<?php if ( ! empty( $city_name ) ) : ?>
+							<span class="decriptat-pj-chip decriptat-pj-chip-soft"><?php echo esc_html( $city_name ); ?></span>
+						<?php endif; ?>
 					</div>
 
 					<h1 class="decriptat-pj-single-title"><?php the_title(); ?></h1>
+
+					<div class="decriptat-pj-single-summary">
+						<?php if ( ! empty( $freshness_label ) ) : ?>
+							<span class="decriptat-pj-summary-item"><?php echo esc_html( $freshness_label ); ?></span>
+						<?php endif; ?>
+						<?php if ( ! empty( $countdown_label ) ) : ?>
+							<span class="decriptat-pj-summary-item"><?php echo esc_html( $countdown_label ); ?></span>
+						<?php endif; ?>
+						<?php if ( ! empty( $source_url ) ) : ?>
+							<span class="decriptat-pj-summary-item"><?php esc_html_e( 'Link catre anuntul oficial', 'decriptat-public-jobs' ); ?></span>
+						<?php endif; ?>
+					</div>
 
 					<div class="decriptat-pj-meta-chips">
 						<?php if ( ! empty( $institutions ) && ! is_wp_error( $institutions ) ) : ?>
@@ -84,6 +102,9 @@ get_header();
 							<?php endif; ?>
 							<?php if ( ! empty( $location ) ) : ?>
 								<li><span><?php esc_html_e( 'Locatie', 'decriptat-public-jobs' ); ?></span><strong><?php echo esc_html( $location ); ?></strong></li>
+							<?php endif; ?>
+							<?php if ( ! empty( $city_name ) ) : ?>
+								<li><span><?php esc_html_e( 'Oras', 'decriptat-public-jobs' ); ?></span><strong><?php echo esc_html( $city_name ); ?></strong></li>
 							<?php endif; ?>
 							<?php if ( ! empty( $institutions ) && ! is_wp_error( $institutions ) ) : ?>
 								<li><span><?php esc_html_e( 'Institutie', 'decriptat-public-jobs' ); ?></span><strong><?php echo esc_html( $institutions[0]->name ); ?></strong></li>

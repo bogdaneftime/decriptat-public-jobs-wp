@@ -8,6 +8,7 @@ get_header();
 $search_query       = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : '';
 $selected_category  = isset( $_GET['job_category'] ) ? sanitize_title( wp_unslash( $_GET['job_category'] ) ) : '';
 $selected_institute = isset( $_GET['institution'] ) ? sanitize_title( wp_unslash( $_GET['institution'] ) ) : '';
+$selected_city      = isset( $_GET['job_city'] ) ? sanitize_title( wp_unslash( $_GET['job_city'] ) ) : '';
 $selected_status    = function_exists( 'decriptat_pj_get_status_filter' ) ? decriptat_pj_get_status_filter() : 'active';
 $category_terms     = get_terms(
 	array(
@@ -21,13 +22,90 @@ $institution_terms  = get_terms(
 		'hide_empty' => true,
 	)
 );
+$city_terms         = get_terms(
+	array(
+		'taxonomy'   => 'job_city',
+		'hide_empty' => true,
+	)
+);
 ?>
 
+<?php
+$all_jobs = function_exists( 'decriptat_pj_get_filtered_jobs' )
+	? decriptat_pj_get_filtered_jobs(
+		array(
+			'status_filter' => 'all',
+		)
+	)
+	: array();
+$overview_stats = function_exists( 'decriptat_pj_get_jobs_overview_stats' ) ? decriptat_pj_get_jobs_overview_stats( $all_jobs ) : array();
+$top_institutions = function_exists( 'decriptat_pj_get_top_institutions' ) ? decriptat_pj_get_top_institutions( $all_jobs ) : array();
+?>
 <main id="primary" class="site-main decriptat-pj-shell decriptat-pj-archive">
 	<header class="decriptat-pj-page-header">
-		<h1 class="decriptat-pj-page-title"><?php esc_html_e( 'Joburi in sectorul public', 'decriptat-public-jobs' ); ?></h1>
-		<p class="decriptat-pj-page-intro"><?php esc_html_e( 'Anunturi verificate, prezentate clar pentru aplicare rapida.', 'decriptat-public-jobs' ); ?></p>
+		<div class="decriptat-pj-page-hero">
+			<div class="decriptat-pj-page-copy">
+				<p class="decriptat-pj-eyebrow"><?php esc_html_e( 'Monitorizare centralizata', 'decriptat-public-jobs' ); ?></p>
+				<h1 class="decriptat-pj-page-title"><?php esc_html_e( 'Joburi in sectorul public', 'decriptat-public-jobs' ); ?></h1>
+				<p class="decriptat-pj-page-intro"><?php esc_html_e( 'Anunturi oficiale, filtrate clar dupa institutie, oras si termen, ca sa vezi repede unde merita sa aplici.', 'decriptat-public-jobs' ); ?></p>
+				<div class="decriptat-pj-trust-row">
+					<span class="decriptat-pj-trust-pill"><?php esc_html_e( 'Surse oficiale', 'decriptat-public-jobs' ); ?></span>
+					<span class="decriptat-pj-trust-pill"><?php esc_html_e( 'Actualizari recente', 'decriptat-public-jobs' ); ?></span>
+					<span class="decriptat-pj-trust-pill"><?php esc_html_e( 'Filtre rapide', 'decriptat-public-jobs' ); ?></span>
+				</div>
+			</div>
+			<?php if ( ! empty( $overview_stats ) ) : ?>
+				<div class="decriptat-pj-kpi-grid" aria-label="<?php esc_attr_e( 'Statistici joburi', 'decriptat-public-jobs' ); ?>">
+					<div class="decriptat-pj-kpi-card">
+						<strong><?php echo esc_html( number_format_i18n( $overview_stats['active'] ) ); ?></strong>
+						<span><?php esc_html_e( 'joburi active', 'decriptat-public-jobs' ); ?></span>
+					</div>
+					<div class="decriptat-pj-kpi-card">
+						<strong><?php echo esc_html( number_format_i18n( $overview_stats['institutions'] ) ); ?></strong>
+						<span><?php esc_html_e( 'institutii monitorizate', 'decriptat-public-jobs' ); ?></span>
+					</div>
+					<div class="decriptat-pj-kpi-card">
+						<strong><?php echo esc_html( number_format_i18n( $overview_stats['recent'] ) ); ?></strong>
+						<span><?php esc_html_e( 'publicate in ultimele 30 zile', 'decriptat-public-jobs' ); ?></span>
+					</div>
+					<div class="decriptat-pj-kpi-card">
+						<strong><?php echo esc_html( number_format_i18n( $overview_stats['total'] ) ); ?></strong>
+						<span><?php esc_html_e( 'anunturi in arhiva', 'decriptat-public-jobs' ); ?></span>
+					</div>
+				</div>
+			<?php endif; ?>
+		</div>
 	</header>
+
+	<?php if ( ! empty( $top_institutions ) ) : ?>
+		<section class="decriptat-pj-spotlight-block" aria-label="<?php esc_attr_e( 'Institutiile cu cele mai multe joburi active', 'decriptat-public-jobs' ); ?>">
+			<div class="decriptat-pj-section-heading">
+				<div>
+					<p class="decriptat-pj-section-kicker"><?php esc_html_e( 'Institutiile active acum', 'decriptat-public-jobs' ); ?></p>
+					<h2><?php esc_html_e( 'Unde se publica cel mai des', 'decriptat-public-jobs' ); ?></h2>
+				</div>
+				<p><?php esc_html_e( 'Selecteaza direct o institutie cu roluri active ca sa restrangi cautarea mai repede.', 'decriptat-public-jobs' ); ?></p>
+			</div>
+			<div class="decriptat-pj-institution-grid">
+				<?php foreach ( $top_institutions as $institution ) : ?>
+					<a class="decriptat-pj-institution-card" href="<?php echo esc_url( add_query_arg( 'institution', $institution['slug'], get_post_type_archive_link( 'public_job' ) ) ); ?>">
+						<span class="decriptat-pj-institution-name"><?php echo esc_html( $institution['name'] ); ?></span>
+						<span class="decriptat-pj-institution-count">
+							<?php
+							echo esc_html(
+								sprintf(
+									/* translators: %d number of active jobs. */
+									_n( '%d job activ', '%d joburi active', $institution['count'], 'decriptat-public-jobs' ),
+									$institution['count']
+								)
+							);
+							?>
+						</span>
+					</a>
+				<?php endforeach; ?>
+			</div>
+		</section>
+	<?php endif; ?>
 
 	<section class="decriptat-pj-filter-block" aria-label="<?php esc_attr_e( 'Cautare si filtre', 'decriptat-public-jobs' ); ?>">
 		<form method="get" class="decriptat-pj-filter-form">
@@ -71,6 +149,20 @@ $institution_terms  = get_terms(
 			</div>
 
 			<div class="decriptat-pj-filter-field">
+				<label for="decriptat-pj-job-city"><?php esc_html_e( 'Oras', 'decriptat-public-jobs' ); ?></label>
+				<select id="decriptat-pj-job-city" name="job_city">
+					<option value=""><?php esc_html_e( 'Toate', 'decriptat-public-jobs' ); ?></option>
+					<?php if ( ! is_wp_error( $city_terms ) ) : ?>
+						<?php foreach ( $city_terms as $term ) : ?>
+							<option value="<?php echo esc_attr( $term->slug ); ?>" <?php selected( $selected_city, $term->slug ); ?>>
+								<?php echo esc_html( $term->name ); ?>
+							</option>
+						<?php endforeach; ?>
+					<?php endif; ?>
+				</select>
+			</div>
+
+			<div class="decriptat-pj-filter-field">
 				<label for="decriptat-pj-status"><?php esc_html_e( 'Status', 'decriptat-public-jobs' ); ?></label>
 				<select id="decriptat-pj-status" name="status">
 					<option value="active" <?php selected( $selected_status, 'active' ); ?>><?php esc_html_e( 'Active', 'decriptat-public-jobs' ); ?></option>
@@ -88,115 +180,30 @@ $institution_terms  = get_terms(
 		</form>
 	</section>
 
-	<?php if ( have_posts() ) : ?>
-		<?php
-		global $wp_query;
-		$sorted_posts = $wp_query->posts;
-		if ( function_exists( 'decriptat_pj_unique_posts' ) ) {
-			$sorted_posts = decriptat_pj_unique_posts( $sorted_posts );
-		}
-		if ( function_exists( 'decriptat_pj_unique_jobs' ) ) {
-			$sorted_posts = decriptat_pj_unique_jobs( $sorted_posts );
-		}
-		if ( function_exists( 'decriptat_pj_job_matches_status' ) ) {
-			$sorted_posts = array_values(
-				array_filter(
-					$sorted_posts,
-					function ( $job_post ) use ( $selected_status ) {
-						$state = decriptat_pj_get_job_state( $job_post->ID );
-						return decriptat_pj_job_matches_status( $state, $selected_status );
-					}
-				)
-			);
-		}
-		if ( function_exists( 'decriptat_pj_sort_jobs' ) ) {
-			usort( $sorted_posts, 'decriptat_pj_sort_jobs' );
-		}
-		?>
-		<?php if ( ! empty( $sorted_posts ) ) : ?>
+	<?php
+	$sorted_posts = function_exists( 'decriptat_pj_get_filtered_jobs' )
+		? decriptat_pj_get_filtered_jobs(
+			array(
+				'search_query'        => $search_query,
+				'selected_category'   => $selected_category,
+				'selected_institution' => $selected_institute,
+				'selected_city'       => $selected_city,
+				'status_filter'       => $selected_status,
+			)
+		)
+		: array();
+	?>
+	<?php if ( ! empty( $sorted_posts ) ) : ?>
 		<div class="decriptat-pj-job-grid">
 			<?php
 			foreach ( $sorted_posts as $job_post ) :
-				$post_id        = $job_post->ID;
-				$source_url     = get_post_meta( $post_id, 'source_url', true );
-				$deadline       = get_post_meta( $post_id, 'deadline', true );
-				$location       = get_post_meta( $post_id, 'location', true );
-				$published_date = get_post_meta( $post_id, 'published_date', true );
-				$is_it          = (bool) get_post_meta( $post_id, 'is_it', true );
-				$state          = function_exists( 'decriptat_pj_get_job_state' ) ? decriptat_pj_get_job_state( $post_id ) : array(
-					'is_expired' => false,
-					'label'      => '',
-				);
-				$job_categories = get_the_terms( $post_id, 'job_category' );
-				$primary_category = '';
-				if ( ! empty( $job_categories ) && ! is_wp_error( $job_categories ) ) {
-					$primary_category = $job_categories[0]->name;
-				}
-				$institutions   = get_the_terms( $post_id, 'institution' );
-				$card_classes   = $state['is_expired'] ? 'decriptat-pj-job-card is-expired' : 'decriptat-pj-job-card';
-				?>
-				<article id="post-<?php echo esc_attr( $post_id ); ?>" <?php post_class( $card_classes, $post_id ); ?>>
-					<div class="decriptat-pj-card-top">
-						<?php if ( ! empty( $state['label'] ) ) : ?>
-							<span class="decriptat-pj-status-badge <?php echo $state['is_expired'] ? 'is-expired' : 'is-active'; ?>">
-								<?php echo esc_html( $state['label'] ); ?>
-							</span>
-						<?php endif; ?>
-						<?php if ( $is_it ) : ?>
-							<span class="decriptat-pj-chip"><?php esc_html_e( 'IT', 'decriptat-public-jobs' ); ?></span>
-						<?php endif; ?>
-					</div>
-
-					<h2 class="decriptat-pj-card-title">
-						<a href="<?php echo esc_url( get_permalink( $post_id ) ); ?>"><?php echo esc_html( get_the_title( $post_id ) ); ?></a>
-					</h2>
-
-					<?php if ( has_excerpt( $post_id ) ) : ?>
-						<div class="decriptat-pj-card-excerpt"><?php echo wp_kses_post( get_the_excerpt( $post_id ) ); ?></div>
-					<?php endif; ?>
-
-					<div class="decriptat-pj-meta-chips">
-						<?php if ( ! empty( $institutions ) && ! is_wp_error( $institutions ) ) : ?>
-							<span class="decriptat-pj-chip decriptat-pj-chip-soft"><?php echo esc_html( $institutions[0]->name ); ?></span>
-						<?php endif; ?>
-						<?php if ( ! empty( $location ) ) : ?>
-							<span class="decriptat-pj-chip decriptat-pj-chip-soft"><?php echo esc_html( $location ); ?></span>
-						<?php endif; ?>
-						<?php if ( ! empty( $deadline ) ) : ?>
-							<span class="decriptat-pj-chip decriptat-pj-chip-soft"><?php echo esc_html( sprintf( __( 'Termen: %s', 'decriptat-public-jobs' ), decriptat_pj_format_date( $deadline ) ) ); ?></span>
-						<?php endif; ?>
-					</div>
-
-					<?php if ( ! empty( $primary_category ) ) : ?>
-						<div class="decriptat-pj-category-badges">
-							<span class="decriptat-pj-category-badge"><?php echo esc_html( $primary_category ); ?></span>
-						</div>
-					<?php endif; ?>
-
-					<div class="decriptat-pj-card-footer">
-						<?php if ( ! empty( $published_date ) ) : ?>
-							<span class="decriptat-pj-published"><?php echo esc_html( sprintf( __( 'Publicat: %s', 'decriptat-public-jobs' ), decriptat_pj_format_date( $published_date ) ) ); ?></span>
-						<?php endif; ?>
-						<div class="decriptat-pj-card-links">
-							<a href="<?php echo esc_url( get_permalink( $post_id ) ); ?>"><?php esc_html_e( 'Vezi detalii', 'decriptat-public-jobs' ); ?></a>
-							<?php if ( ! empty( $source_url ) ) : ?>
-								<a href="<?php echo esc_url( $source_url ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Sursa oficiala', 'decriptat-public-jobs' ); ?></a>
-							<?php endif; ?>
-						</div>
-					</div>
-				</article>
+				decriptat_pj_render_job_card( $job_post );
 			<?php endforeach; ?>
 		</div>
 		<?php else : ?>
 		<section class="decriptat-pj-empty-state">
 			<h2><?php esc_html_e( 'Nu exista joburi pentru filtrul selectat.', 'decriptat-public-jobs' ); ?></h2>
 			<p><?php esc_html_e( 'Incearca alt status sau reseteaza filtrele.', 'decriptat-public-jobs' ); ?></p>
-		</section>
-		<?php endif; ?>
-	<?php else : ?>
-		<section class="decriptat-pj-empty-state">
-			<h2><?php esc_html_e( 'Momentan nu exista joburi publicate.', 'decriptat-public-jobs' ); ?></h2>
-			<p><?php esc_html_e( 'Revino in curand pentru noi anunturi.', 'decriptat-public-jobs' ); ?></p>
 		</section>
 	<?php endif; ?>
 </main>
